@@ -121,12 +121,12 @@ void output_stats(){
 	}
 }
 
-void increment_counter(byte_packet_counter& counter, u_int16_t length){
+inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
 	counter.packets++;
 	counter.bytes += length;
 }
 
-void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
+inline void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
 		increment_counter(counter->tcp, length);
@@ -177,10 +177,20 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 				return;
 			}
 			counter = &(hash_buckets[addr_idx]->out);
+
+			//Check non-hashed ip
+			if (counter->ip != ADDR_TO_UINT(ip->ip_dst)){
+				return;
+			}
 		}
 		else
 		{
 			counter = &(hash_buckets[addr_idx]->in);
+
+			//Check non-hashed ip
+			if (counter->ip != ADDR_TO_UINT(ip->ip_src)){
+				return;
+			}
 		}
 
 		increment_direction(ip->ip_p, counter, length);
