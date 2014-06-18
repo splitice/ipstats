@@ -205,8 +205,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 
 /* callback function that is passed to pcap_loop(..) and called each time
 * a packet is recieved                                                    */
-void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char*
-	packet)
+void my_callback(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 
@@ -313,7 +312,7 @@ int main(int argc, char **argv)
 	load_devs(dev);
 
 	/* open device for reading */
-	descr = pcap_open_live(dev, 200, 0, 0, errbuf);
+	descr = pcap_open_live(dev, 200, 0, 1000, errbuf);
 	if (descr == NULL)
 	{
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
@@ -322,7 +321,14 @@ int main(int argc, char **argv)
 	//pcap_setdirection(descr,PCAP_D_IN)
 
 	hostorder_ip = ntohs(ETHERTYPE_IP);
-	pcap_loop(descr, -1, my_callback, NULL);
+
+	struct pcap_pkthdr* pkthdr;
+	const u_char* packet;
+
+	while ((res = pcap_next_ex(descr, &pkthdr, &packet)) >= 0)
+	{
+		my_callback(pkthdr, packet);
+	}
 
 	fprintf(stdout, "\nDone. Closing!\n");
 	return 0;
