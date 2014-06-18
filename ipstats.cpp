@@ -219,7 +219,7 @@ void my_callback(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	//else: dont care
 }
 
-void load_hash_buckets(u_int16_t num_counters, int* counters)
+void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 {
 	bool loaded = false;
 
