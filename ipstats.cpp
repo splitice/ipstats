@@ -205,7 +205,7 @@ void load_hash_buckets()
 				loaded = false;
 				break;
 			}
-			hash_buckets[addr_idx] = *iterator;
+			hash_buckets[addr_idx] = c;
 		}
 	}
 }
