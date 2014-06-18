@@ -28,40 +28,23 @@
 #include <unistd.h>
 #include <vector>
 
-class ipstat_directional_counters {
-public:
-	unsigned long gre_packets;
-	unsigned long gre_bytes;
+class byte_packet_counter {
+	unsigned long bytes;
+	unsigned long packets;
 
-	unsigned long ipip_packets;
-	unsigned long ipip_bytes;
-
-	unsigned long tcp_packets;
-	unsigned long tcp_bytes;
-
-	unsigned long udp_packets;
-	unsigned long udp_bytes;
-
-	unsigned long ipsec_packets;
-	unsigned long ipsec_bytes;
-
-	unsigned long other_packets;
-	unsigned long other_bytes;
-
-	ipstat_directional_counters(){
-		gre_packets = 0;
-		gre_bytes = 0;
-		ipip_packets = 0;
-		ipip_bytes = 0;
-		tcp_packets = 0;
-		tcp_bytes = 0;
-		udp_packets = 0;
-		udp_bytes = 0;
-		ipsec_packets = 0;
-		ipsec_bytes = 0;
-		other_packets = 0;
-		other_bytes = 0;
+	byte_packet_counter(){
+		bytes = 0;
+		packets = 0;
 	}
+};
+
+struct ipstat_directional_counters {
+	byte_packet_counter gre;
+	byte_packet_counter ipip;
+	byte_packet_counter tcp;
+	byte_packet_counter udp;
+	byte_packet_counter ipsec;
+	byte_packet_counter other;
 };
 
 struct ipstat_counters {
@@ -93,10 +76,10 @@ struct nread_ip {
 
 #define ADDR_TO_UINT(x) *(unsigned int*)&(x)
 
-int packet_counter = 0;
+unsigned int packet_counter = 0;
 char errbuf[PCAP_ERRBUF_SIZE];
 unsigned int hash_key = 0;
-ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
+ipstat_counters hash_buckets[HASH_BUCKET_SLOTS];
 std::vector<ipstat_counters*> counters;
 
 void output_stats(){
@@ -106,44 +89,40 @@ void output_stats(){
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
 		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
-			counters->in.tcp_packets, counters->in.tcp_bytes, counters->in.udp_packets, counters->in.udp_bytes, counters->in.gre_packets, counters->in.gre_bytes,
-			counters->in.ipip_packets, counters->in.ipip_bytes, counters->in.ipsec_packets, counters->in.ipsec_bytes, counters->in.other_packets, counters->in.other_bytes);
+			counters->in.tcp.packets, counters->in.tcp.bytes, counters->in.udp.packets, counters->in.udp.bytes, counters->in.gre.packets, counters->in.gre.bytes,
+			counters->in.ipip.packets, counters->in.ipip.bytes, counters->in.ipsec.packets, counters->in.ipsec.bytes, counters->in.other.packets, counters->in.other.bytes);
 		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
-			counters->out.tcp_packets, counters->out.tcp_bytes, counters->out.udp_packets, counters->out.udp_bytes, counters->out.gre_packets, counters->out.gre_bytes,
-			counters->out.ipip_packets, counters->out.ipip_bytes, counters->out.ipsec_packets, counters->out.ipsec_bytes, counters->out.other_packets, counters->out.other_bytes);
+			counters->out.tcp.packets, counters->out.tcp.bytes, counters->out.udp.packets, counters->out.udp.bytes, counters->out.gre.packets, counters->out.gre.bytes,
+			counters->out.ipip.packets, counters->out.ipip.bytes, counters->out.ipsec.packets, counters->out.ipsec.bytes, counters->out.other.packets, counters->out.other.bytes);
 	}
 }
 
-void increment_counter(u_int8_t protocol, ipstat_directional_counters* counter, int length){
-	if (protocol == IPPROTO_TCP)
-	{
-		counter->tcp_packets++;
-		counter->tcp_bytes += length;
-	}
-	else if (protocol == IPPROTO_UDP)
-	{
-		counter->udp_packets++;
-		counter->udp_bytes += length;
-	}
-	else if (protocol == IPPROTO_GRE)
-	{
-		counter->gre_packets++;
-		counter->gre_bytes += length;
-	}
-	else if (protocol == IPPROTO_IPIP)
-	{
-		counter->ipip_packets++;
-		counter->ipip_bytes += length;
-	}
-	else if (protocol == IPPROTO_ESP || protocol == IPPROTO_AH)
-	{
-		counter->ipsec_packets++;
-		counter->ipsec_bytes += length;
-	}
-	else
-	{
-		counter->other_packets++;
-		counter->other_bytes += length;
+void increment_counter(byte_packet_counter& counter){
+	counter.packets++;
+	counter.bytes += length;
+}
+
+void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, int length){
+	switch (protocol){
+	case IPPROTO_TCP:
+		increment_counter(counter->tcp);
+		break;
+	case IPPROTO_UDP:
+		increment_counter(counter->udp);
+		break;
+	case IPPROTO_GRE:
+		increment_counter(counter->gre);
+		break;
+	case IPPROTO_IPIP:
+		increment_counter(counter->ipip);
+		break;
+	case IPPROTO_ESP:
+	case IPPROTO_AH:
+		increment_counter(counter->gre);
+		break;
+	default:
+		increment_counter(counter->other);
+		break;
 	}
 }
 
@@ -180,7 +159,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 			counter = &(hash_buckets[addr_idx]->in);
 		}
 
-		increment_counter(ip->ip_p, counter, length);
+		increment_direction(ip->ip_p, counter, length);
 	}
 }
 
@@ -189,8 +168,6 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char*
 	packet)
 {
-	u_int caplen = pkthdr->caplen; /* length of portion present from bpf  */
-	u_int length = pkthdr->len;    /* length of this packet off the wire  */
 	struct ether_header *eptr;     /* net/ethernet.h                      */
 	u_short ether_type;            /* the type of packet (we return this) */
 	eptr = (struct ether_header *) packet;
@@ -201,9 +178,9 @@ void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char
 	}
 	//else: dont care
 
-	packet_counter++;
-	if ((packet_counter % OUTPUT_EVERY_PACKETS) == 0){
+	if ((++packet_counter) == OUTPUT_EVERY_PACKETS){
 		output_stats();
+		packet_counter = 0;
 	}
 }
 
@@ -270,7 +247,7 @@ int main(int argc, char **argv)
 	load_devs(dev);
 
 	/* open device for reading */
-	descr = pcap_open_live(dev, BUFSIZ, 0, 1000, errbuf);
+	descr = pcap_open_live(dev, 200, 0, 1000, errbuf);
 	if (descr == NULL)
 	{
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
