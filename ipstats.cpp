@@ -85,7 +85,7 @@ ipstat_counters* counters;
 
 void output_stats(){
 	for (int i = 0; i < num_counters;i++) {
-		ipstat_counters* c = counters[i];
+		ipstat_counters* c = &counters[i];
 		unsigned int ip = c->ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
@@ -199,7 +199,7 @@ void load_hash_buckets()
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
-			ipstat_counters* c = counters[i];
+			ipstat_counters* c = &counters[i];
 			unsigned int addr_idx = (c->ip * hash_key) % HASH_BUCKET_SLOTS;
 			if (hash_buckets[addr_idx] != 0){
 				loaded = false;
