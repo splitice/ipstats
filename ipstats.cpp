@@ -225,7 +225,7 @@ void load_hash_buckets(u_int16_t num_counters, ipstat_counters** counters)
 	bool loaded = false;
 
 	//Starting values
-	hash_key = 0;
+	hash_key = 0x17ac;
 	hash_buckets = (ipstat_counters**)malloc(sizeof(ipstat_counters*)*hash_slots);
 
 	//Loop until solution found
@@ -234,7 +234,7 @@ void load_hash_buckets(u_int16_t num_counters, ipstat_counters** counters)
 		hash_key++;
 
 		//overflowed, increase slots.
-		if (hash_key == 0){
+		if (hash_key == 0x17ac){
 			free(hash_buckets);
 			hash_slots++;
 			hash_buckets = (ipstat_counters**)malloc(sizeof(ipstat_counters*)*hash_slots);
@@ -276,7 +276,7 @@ int load_devs(const char* name){
 					num_counters++;
 				}
 			}
-			hash_slots = num_counters;
+			hash_slots = num_counters * 1.5;
 			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
