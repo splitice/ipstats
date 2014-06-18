@@ -68,8 +68,8 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
-//#define ADDR_TO_UINT(x) *(unsigned int*)&(x)
-#define ADDR_TO_UINT(x) x
+#define ADDR_TO_UINT(x) *(unsigned int*)&(x)
+//#define ADDR_TO_UINT(x) x
 
 //Hash lookup
 unsigned int hash_key = 0;
@@ -149,15 +149,10 @@ inline void increment_direction(u_int8_t protocol, ipstat_directional_counters* 
 void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 {
 	const struct nread_ip* ip;   /* packet structure         */
-	const struct nread_tcp* tcp; /* tcp structure            */
-	u_int length = pkthdr->len;  /* packet header length  */
-	u_int off, version;             /* offset, version       */
-	u_int16_t len;                        /* length holder         */
+	u_int version;               /*  version                 */
+	u_int16_t len;               /* length holder            */
 
 	ip = (struct nread_ip*)(packet + sizeof(struct ether_header));
-	length -= sizeof(struct ether_header);
-	tcp = (struct nread_tcp*)(packet + sizeof(struct ether_header) +
-		sizeof(struct nread_ip));
 
 	len = ntohs(ip->ip_len); /* get packet length */
 	version = IP_V(ip);          /* get ip version    */
@@ -189,7 +184,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 			counter = &c.in;
 		}
 
-		increment_direction(ip->ip_p, counter, length);
+		increment_direction(ip->ip_p, counter, len);
 	}
 }
 
@@ -215,7 +210,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 
 	//Starting values
 	hash_key = 0x17ac;
-	hash_buckets = malloc(sizeof(ipstat_counters)*hash_slots);
+	hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
 	memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
 
 	//Loop until solution found
@@ -227,7 +222,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		if (hash_key == 0x17ac){
 			free(hash_buckets);
 			hash_slots++;
-			hash_buckets = malloc(sizeof(ipstat_counters)*hash_slots);
+			hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
 			memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
 		}
 
@@ -238,7 +233,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 
 		//Attempt to find a solution
 		loaded = true;
-		for (int i = 0; i < num_counters; i++) {
+		for (int i = num_counters; i != 0; i--) {
 			unsigned int c = counters[i];
 			unsigned int addr_idx = (c ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip != 0){
@@ -270,7 +265,7 @@ int load_devs(const char* name){
 				}
 			}
 			hash_slots = num_counters * 2.5;
-			counters = malloc(sizeof(unsigned int*)* num_counters);
+			counters = (unsigned int*)malloc(sizeof(unsigned int)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
