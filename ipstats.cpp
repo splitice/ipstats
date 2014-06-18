@@ -53,7 +53,7 @@ struct ipstat_counters {
 	ipstat_directional_counters out;
 };
 
-const uint16_t hostorder_ip;
+uint16_t hostorder_ip;
 
 
 struct nread_ip {
@@ -92,7 +92,7 @@ char errbuf[PCAP_ERRBUF_SIZE];
 
 void output_stats(){
 	for (int i = 0; i < num_counters;i++) {
-		ipstat_counters* c = &counters[i];
+		ipstat_counters* c = counters[i];
 		unsigned int ip = c->ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
