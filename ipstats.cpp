@@ -318,6 +318,8 @@ int main(int argc, char **argv)
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
 	}
 
+	pcap_setnonblock(descr, false, errbuf);
+
 	//pcap_setdirection(descr,PCAP_D_IN)
 
 	hostorder_ip = ntohs(ETHERTYPE_IP);
