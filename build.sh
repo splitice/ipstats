@@ -1,3 +1,3 @@
 #!/bin/bash
 
-gcc ipstats.c -lpcap -O3 -o ipstats
+c99 ipstats.c -lpcap -O3 -o ipstats
