@@ -48,7 +48,7 @@ struct ipstat_directional_counters {
 };
 
 struct ipstat_counters {
-	unsigned int ip;
+	u_int32_t ip;
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
 };
@@ -76,12 +76,17 @@ struct nread_ip {
 
 #define ADDR_TO_UINT(x) *(unsigned int*)&(x)
 
-unsigned int packet_counter = 0;
-char errbuf[PCAP_ERRBUF_SIZE];
+//Hash lookup
 unsigned int hash_key = 0;
 ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
-unsigned int num_counters;
+
+//Counters
+u_int16_t num_counters;
 ipstat_counters* counters;
+
+//Other
+u_int16_t packet_counter = 0;
+char errbuf[PCAP_ERRBUF_SIZE];
 
 void output_stats(){
 	for (int i = 0; i < num_counters;i++) {
@@ -144,12 +149,12 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) * hash_key) % HASH_BUCKET_SLOTS;
+		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % HASH_BUCKET_SLOTS;
 		ipstat_directional_counters* counter;
 
 		if (hash_buckets[addr_idx] == 0){
 			//Not what we are after, try dst
-			addr_idx = (ADDR_TO_UINT(ip->ip_dst) * hash_key) % HASH_BUCKET_SLOTS;
+			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % HASH_BUCKET_SLOTS;
 			if (hash_buckets[addr_idx] == 0){
 				return;
 			}
@@ -200,7 +205,7 @@ void load_hash_buckets()
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
 			ipstat_counters* c = &counters[i];
-			unsigned int addr_idx = (c->ip * hash_key) % HASH_BUCKET_SLOTS;
+			unsigned int addr_idx = (c->ip ^ hash_key) % HASH_BUCKET_SLOTS;
 			if (hash_buckets[addr_idx] != 0){
 				loaded = false;
 				break;
@@ -252,7 +257,7 @@ int main(int argc, char **argv)
 	char *dev;
 	pcap_t* descr;
 
-	if (argc != 2){ fprintf(stdout, "Usage: %s device\n", argv[0]); return 0; }
+	if (argc != 2){ printf("Usage: %s device\n", argv[0]); return 0; }
 
 	/* grab a device to peak into... */
 	dev = argv[1];
@@ -264,6 +269,9 @@ int main(int argc, char **argv)
 	{
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
 	}
+
+	//pcap_setdirection(descr,PCAP_D_IN)
+
 
 	pcap_loop(descr, -1, my_callback, NULL);
 
