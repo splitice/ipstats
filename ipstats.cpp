@@ -30,8 +30,8 @@
 
 class byte_packet_counter {
 public:
-	unsigned long bytes;
-	unsigned long packets;
+	u_int32_t bytes;
+	u_int32_t packets;
 
 	byte_packet_counter(){
 		bytes = 0;
@@ -74,13 +74,12 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
-#define HASH_BUCKET_SLOTS 500
-
 #define ADDR_TO_UINT(x) *(unsigned int*)&(x)
 
 //Hash lookup
 unsigned int hash_key = 0;
-ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
+unsigned int hash_slots;
+ipstat_counters** hash_buckets;
 
 //Counters
 u_int16_t num_counters;
@@ -167,12 +166,12 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % HASH_BUCKET_SLOTS;
+		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
 		ipstat_directional_counters* counter;
 
 		if (hash_buckets[addr_idx] == 0){
 			//Not what we are after, try dst
-			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % HASH_BUCKET_SLOTS;
+			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx] == 0){
 				return;
 			}
@@ -219,18 +218,30 @@ void load_hash_buckets()
 {
 	bool loaded = false;
 
+	//Starting values
+	hash_key = 0;
+	hash_buckets = (ipstat_counters**)malloc(sizeof(ipstat_counters*)*hash_slots);
+
+	//Loop until solution found
 	while (!loaded){
 		//Iterate hash_key, for a different solution
 		hash_key++;
 
+		//overflowed, increase slots.
+		if (hash_key == 0){
+			free(hash_buckets);
+			hash_slots++;
+			hash_buckets = (ipstat_counters**)malloc(sizeof(ipstat_counters*)*hash_slots);
+		}
+
 		//Zero buckets
-		memset(hash_buckets, 0, sizeof(ipstat_counters*)* HASH_BUCKET_SLOTS);
+		memset(hash_buckets, 0, sizeof(ipstat_counters*)* hash_slots);
 
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
 			ipstat_counters* c = counters[i];
-			unsigned int addr_idx = (c->ip ^ hash_key) % HASH_BUCKET_SLOTS;
+			unsigned int addr_idx = (c->ip ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx] != 0){
 				loaded = false;
 				break;
@@ -256,6 +267,7 @@ int load_devs(const char* name){
 					num_counters++;
 				}
 			}
+			hash_slots = num_counters;
 			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
