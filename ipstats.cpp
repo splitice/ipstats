@@ -26,7 +26,6 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <vector>
 
 class byte_packet_counter {
 public:
@@ -81,20 +80,21 @@ unsigned int packet_counter = 0;
 char errbuf[PCAP_ERRBUF_SIZE];
 unsigned int hash_key = 0;
 ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
-std::vector<ipstat_counters*> counters;
+unsigned int num_counters;
+ipstat_counters* counters;
 
 void output_stats(){
-	 for (std::vector<ipstat_counters*>::iterator iterator = counters.begin(); iterator != counters.end(); iterator++) {
-		ipstat_counters* counters = *iterator;
-		unsigned int ip = counters->ip;
+	for (int i = 0; i < num_counters;i++) {
+		ipstat_counters* c = counters[i];
+		unsigned int ip = c->ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
 		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
-			counters->in.tcp.packets, counters->in.tcp.bytes, counters->in.udp.packets, counters->in.udp.bytes, counters->in.gre.packets, counters->in.gre.bytes,
-			counters->in.ipip.packets, counters->in.ipip.bytes, counters->in.ipsec.packets, counters->in.ipsec.bytes, counters->in.other.packets, counters->in.other.bytes);
+			c->in.tcp.packets, c->in.tcp.bytes, c->in.udp.packets, c->in.udp.bytes, c->in.gre.packets, c->in.gre.bytes,
+			c->in.ipip.packets, c->in.ipip.bytes, c->in.ipsec.packets, c->in.ipsec.bytes, c->in.other.packets, c->in.other.bytes);
 		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
-			counters->out.tcp.packets, counters->out.tcp.bytes, counters->out.udp.packets, counters->out.udp.bytes, counters->out.gre.packets, counters->out.gre.bytes,
-			counters->out.ipip.packets, counters->out.ipip.bytes, counters->out.ipsec.packets, counters->out.ipsec.bytes, counters->out.other.packets, counters->out.other.bytes);
+			c->out.tcp.packets, c->out.tcp.bytes, c->out.udp.packets, c->out.udp.bytes, c->out.gre.packets, c->out.gre.bytes,
+			c->out.ipip.packets, c->out.ipip.bytes, c->out.ipsec.packets, c->out.ipsec.bytes, c->out.other.packets, c->out.other.bytes);
 	}
 }
 
@@ -198,8 +198,9 @@ void load_hash_buckets()
 
 		//Attempt to find a solution
 		loaded = true;
-		for (std::vector<ipstat_counters*>::iterator iterator = counters.begin(); iterator != counters.end(); iterator++) {
-			unsigned int addr_idx = ((*iterator)->ip * hash_key) % HASH_BUCKET_SLOTS;
+		for (int i = 0; i < num_counters; i++) {
+			ipstat_counters* c = counters[i];
+			unsigned int addr_idx = (c->ip * hash_key) % HASH_BUCKET_SLOTS;
 			if (hash_buckets[addr_idx] != 0){
 				loaded = false;
 				break;
@@ -219,14 +220,24 @@ int load_devs(const char* name){
 
 	for (pcap_if_t *d = alldevs; d != NULL; d = d->next) {
 		if (strcmp(d->name, name) == 0){
+			num_counters = 0;
+			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
+				if (a->addr->sa_family == AF_INET){
+					num_counters++;
+				}
+			}
+			counters = malloc(sizeof(ipstat_counters*)* num_counters);
+			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
 					unsigned int addr = ADDR_TO_UINT(((struct sockaddr_in*)a->addr)->sin_addr);
 					ipstat_counters* counter = new ipstat_counters();
 					counter->ip = addr;
-					counters.push_back(counter);
+					counters[i] = counter;
+					i++;
 				}
 			}
+			break;
 		}
 	}
 
