@@ -53,6 +53,8 @@ struct ipstat_counters {
 	ipstat_directional_counters out;
 };
 
+const uint16_t hostorder_ip = ntohs(ETHERTYPE_IP);
+
 
 struct nread_ip {
 	u_int8_t        ip_vhl;          /* header length, version    */
@@ -174,20 +176,17 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char*
 	packet)
 {
-	struct ether_header *eptr;     /* net/ethernet.h                      */
-	u_short ether_type;            /* the type of packet (we return this) */
-	eptr = (struct ether_header *) packet;
-	ether_type = ntohs(eptr->ether_type);
+	struct ether_header *eptr = (struct ether_header *) packet;
 
-	if (ether_type == ETHERTYPE_IP) {
+	if (eptr->ether_type == hostorder_ip) {
 		ip_handler(pkthdr, packet);
+
+		if ((++packet_counter) == OUTPUT_EVERY_PACKETS){
+			output_stats();
+			packet_counter = 0;
+		}
 	}
 	//else: dont care
-
-	if ((++packet_counter) == OUTPUT_EVERY_PACKETS){
-		output_stats();
-		packet_counter = 0;
-	}
 }
 
 void load_hash_buckets()
