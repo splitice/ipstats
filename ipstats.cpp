@@ -86,7 +86,7 @@ ipstat_counters** hash_buckets;
 u_int16_t packet_counter = 0;
 u_int16_t packet_output_count = 0;
 unsigned int next_time = 0;
-#define TIME_INTERVAL 30
+#define TIME_INTERVAL 10
 
 //PCAP
 char errbuf[PCAP_ERRBUF_SIZE];
@@ -158,6 +158,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	u_int length = pkthdr->len;  /* packet header length  */
 	u_int off, version;             /* offset, version       */
 	u_int16_t len;                        /* length holder         */
+	ipstat_counters* c;
 
 	ip = (struct nread_ip*)(packet + sizeof(struct ether_header));
 	length -= sizeof(struct ether_header);
@@ -169,27 +170,31 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 
 	if (version == 4){
 		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
+		c = hash_buckets[addr_idx];
+
 		ipstat_directional_counters* counter;
 
-		if (hash_buckets[addr_idx] == 0){
+		if (c == 0){
 			//Not what we are after, try dst
 			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
-			if (hash_buckets[addr_idx] == 0){
+			c = hash_buckets[addr_idx];
+
+			if (c == 0){
 				return;
 			}
-			counter = &(hash_buckets[addr_idx]->out);
+			counter = &(c->out);
 
 			//Check non-hashed ip
-			if (counter->ip != ADDR_TO_UINT(ip->ip_dst)){
+			if (c->ip != ADDR_TO_UINT(ip->ip_dst)){
 				return;
 			}
 		}
 		else
 		{
-			counter = &(hash_buckets[addr_idx]->in);
+			counter = &(c->in);
 
 			//Check non-hashed ip
-			if (counter->ip != ADDR_TO_UINT(ip->ip_src)){
+			if (c->ip != ADDR_TO_UINT(ip->ip_src)){
 				return;
 			}
 		}
