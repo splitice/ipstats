@@ -247,7 +247,7 @@ void load_hash_buckets(u_int16_t num_counters, int* counters)
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
-			ipstat_counters* c = counters[i];
+			unsigned int c = counters[i];
 			unsigned int addr_idx = (c ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip != 0){
 				loaded = false;
@@ -260,7 +260,7 @@ void load_hash_buckets(u_int16_t num_counters, int* counters)
 
 int load_devs(const char* name){
 	u_int16_t num_counters;
-	int* counters;
+	unsigned int* counters;
 
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
