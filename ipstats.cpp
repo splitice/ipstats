@@ -311,6 +311,8 @@ int main(int argc, char **argv)
 	dev = argv[1];
 	load_devs(dev);
 
+	printf("# Init complete. Starting\n");
+
 	/* open device for reading */
 	descr = pcap_open_live(dev, 200, 0, 1000, errbuf);
 	if (descr == NULL)
