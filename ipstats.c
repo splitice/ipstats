@@ -122,26 +122,26 @@ inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
 	counter.bytes += length;
 }
 
-inline void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
+inline void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
-		increment_counter(counter->tcp, length);
+		increment_counter(counter.tcp, length);
 		break;
 	case IPPROTO_UDP:
-		increment_counter(counter->udp, length);
+		increment_counter(counter.udp, length);
 		break;
 	case IPPROTO_GRE:
-		increment_counter(counter->gre, length);
+		increment_counter(counter.gre, length);
 		break;
 	case IPPROTO_IPIP:
-		increment_counter(counter->ipip, length);
+		increment_counter(counter.ipip, length);
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
-		increment_counter(counter->ipsec, length);
+		increment_counter(counter.ipsec, length);
 		break;
 	default:
-		increment_counter(counter->other, length);
+		increment_counter(counter.other, length);
 		break;
 	}
 }
@@ -172,7 +172,8 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 			if (c2.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_dst)){
 				return;
 			}
-			counter = &c2.out;
+
+			increment_direction(ip->ip_p, &c2.out, len);
 		}
 		else
 		{
@@ -181,10 +182,8 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 				return;
 			}
 
-			counter = &c.in;
+			increment_direction(ip->ip_p, &c.in, len);
 		}
-
-		increment_direction(ip->ip_p, counter, len);
 	}
 }
 
