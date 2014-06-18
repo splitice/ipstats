@@ -53,7 +53,7 @@ struct ipstat_counters {
 	ipstat_directional_counters out;
 };
 
-const uint16_t hostorder_ip = ntohs(ETHERTYPE_IP);
+const uint16_t hostorder_ip;
 
 
 struct nread_ip {
@@ -203,7 +203,7 @@ void load_hash_buckets()
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
-			ipstat_counters* c = &counters[i];
+			ipstat_counters* c = counters[i];
 			unsigned int addr_idx = (c->ip ^ hash_key) % HASH_BUCKET_SLOTS;
 			if (hash_buckets[addr_idx] != 0){
 				loaded = false;
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 
 	//pcap_setdirection(descr,PCAP_D_IN)
 
-
+	hostorder_ip = ntohs(ETHERTYPE_IP);
 	pcap_loop(descr, -1, my_callback, NULL);
 
 	fprintf(stdout, "\nDone. Closing!\n");
