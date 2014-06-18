@@ -1,3 +1,3 @@
 #!/bin/bash
 
-g++ ipstats.cpp -lpcap -g -O3 -o ipstats
+gcc ipstats.c -lpcap -O3 -o ipstats
