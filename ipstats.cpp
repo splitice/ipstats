@@ -98,31 +98,31 @@ void output_stats(){
 	}
 }
 
-void increment_counter(byte_packet_counter& counter){
+void increment_counter(byte_packet_counter& counter, u_int16_t length){
 	counter.packets++;
 	counter.bytes += length;
 }
 
-void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, int length){
+void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
-		increment_counter(counter->tcp);
+		increment_counter(counter->tcp, length);
 		break;
 	case IPPROTO_UDP:
-		increment_counter(counter->udp);
+		increment_counter(counter->udp, length);
 		break;
 	case IPPROTO_GRE:
-		increment_counter(counter->gre);
+		increment_counter(counter->gre, length);
 		break;
 	case IPPROTO_IPIP:
-		increment_counter(counter->ipip);
+		increment_counter(counter->ipip, length);
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
-		increment_counter(counter->gre);
+		increment_counter(counter->gre, length);
 		break;
 	default:
-		increment_counter(counter->other);
+		increment_counter(counter->other, length);
 		break;
 	}
 }
@@ -133,7 +133,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	const struct nread_tcp* tcp; /* tcp structure            */
 	u_int length = pkthdr->len;  /* packet header length  */
 	u_int off, version;             /* offset, version       */
-	int len;                        /* length holder         */
+	u_int16_t len;                        /* length holder         */
 
 	ip = (struct nread_ip*)(packet + sizeof(struct ether_header));
 	length -= sizeof(struct ether_header);
