@@ -81,9 +81,6 @@ unsigned int hash_key = 0;
 unsigned int hash_slots;
 ipstat_counters** hash_buckets;
 
-//Counters
-u_int16_t num_counters;
-ipstat_counters** counters;
 
 //Packet counting
 u_int16_t packet_counter = 0;
@@ -106,8 +103,13 @@ void output_stats(){
 	next_time = tv.tv_sec + TIME_INTERVAL;
 	packet_output_count -= 100;
 	
-	for (int i = 0; i < num_counters;i++) {
-		ipstat_counters* c = counters[i];
+	for (int i = 0; i < hash_slots; i++) {
+		ipstat_counters* c = hash_buckets[i];
+		
+		//empty bucket
+		if (c == 0)
+			continue;
+
 		unsigned int ip = c->ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
@@ -214,7 +216,7 @@ void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char
 	//else: dont care
 }
 
-void load_hash_buckets()
+void load_hash_buckets(u_int16_t num_counters, ipstat_counters** counters)
 {
 	bool loaded = false;
 
@@ -252,6 +254,9 @@ void load_hash_buckets()
 }
 
 int load_devs(const char* name){
+	u_int16_t num_counters;
+	ipstat_counters** counters;
+
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
 	if (status != 0) {
@@ -285,7 +290,9 @@ int load_devs(const char* name){
 
 	pcap_freealldevs(alldevs);
 
-	load_hash_buckets();
+	load_hash_buckets(num_counters, counters);
+
+	free(counters);
 }
 
 int main(int argc, char **argv)
