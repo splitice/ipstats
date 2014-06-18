@@ -173,7 +173,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 				return;
 			}
 
-			increment_direction(ip->ip_p, &c2.out, len);
+			increment_direction(ip->ip_p, c2.out, len);
 		}
 		else
 		{
@@ -182,7 +182,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 				return;
 			}
 
-			increment_direction(ip->ip_p, &c.in, len);
+			increment_direction(ip->ip_p, c.in, len);
 		}
 	}
 }
