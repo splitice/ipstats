@@ -276,7 +276,7 @@ int load_devs(const char* name){
 					num_counters++;
 				}
 			}
-			hash_slots = num_counters * 1.5;
+			hash_slots = num_counters * 3;
 			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
