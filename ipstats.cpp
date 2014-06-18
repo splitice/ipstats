@@ -84,7 +84,7 @@ ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
 
 //Counters
 u_int16_t num_counters;
-ipstat_counters* counters;
+ipstat_counters** counters;
 
 //Other
 u_int16_t packet_counter = 0;
@@ -230,7 +230,7 @@ int load_devs(const char* name){
 					num_counters++;
 				}
 			}
-			counters = (ipstat_counters*)malloc(sizeof(ipstat_counters*)* num_counters);
+			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
