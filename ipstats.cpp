@@ -313,7 +313,7 @@ int main(int argc, char **argv)
 	load_devs(dev);
 
 	/* open device for reading */
-	descr = pcap_open_live(dev, 200, 0, 1000, errbuf);
+	descr = pcap_open_live(dev, 200, 0, 0, errbuf);
 	if (descr == NULL)
 	{
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
