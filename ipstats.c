@@ -161,8 +161,6 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
 		ipstat_counters& c = hash_buckets[addr_idx];
 
-		ipstat_directional_counters* counter;
-
 		if (c.ip == 0){
 			//Not what we are after, try dst
 			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
