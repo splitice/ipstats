@@ -26,6 +26,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 class byte_packet_counter {
 public:
@@ -73,7 +74,6 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
-#define OUTPUT_EVERY_PACKETS 1000
 #define HASH_BUCKET_SLOTS 500
 
 #define ADDR_TO_UINT(x) *(unsigned int*)&(x)
@@ -86,11 +86,27 @@ ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
 u_int16_t num_counters;
 ipstat_counters** counters;
 
-//Other
+//Packet counting
 u_int16_t packet_counter = 0;
+u_int16_t packet_output_count = 0;
+unsigned int next_time = 0;
+#define TIME_INTERVAL 30
+
+//PCAP
 char errbuf[PCAP_ERRBUF_SIZE];
 
 void output_stats(){
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (tv.tv_sec < next_time){
+		packet_output_count += 100;
+		return;
+	}
+
+	//Next time to do work
+	next_time = tv.tv_sec + TIME_INTERVAL;
+	packet_output_count -= 100;
+	
 	for (int i = 0; i < num_counters;i++) {
 		ipstat_counters* c = counters[i];
 		unsigned int ip = c->ip;
@@ -126,7 +142,7 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
-		increment_counter(counter->gre, length);
+		increment_counter(counter->ipsec, length);
 		break;
 	default:
 		increment_counter(counter->other, length);
@@ -181,7 +197,7 @@ void my_callback(u_char *useless, const struct pcap_pkthdr* pkthdr, const u_char
 	if (eptr->ether_type == hostorder_ip) {
 		ip_handler(pkthdr, packet);
 
-		if ((++packet_counter) == OUTPUT_EVERY_PACKETS){
+		if ((++packet_counter) == packet_output_count){
 			output_stats();
 			packet_counter = 0;
 		}
