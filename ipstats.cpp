@@ -325,6 +325,7 @@ int main(int argc, char **argv)
 	struct pcap_pkthdr* pkthdr;
 	const u_char* packet;
 
+	int res;
 	while ((res = pcap_next_ex(descr, &pkthdr, &packet)) >= 0)
 	{
 		my_callback(pkthdr, packet);
