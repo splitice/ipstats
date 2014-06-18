@@ -29,6 +29,7 @@
 #include <vector>
 
 class byte_packet_counter {
+public:
 	unsigned long bytes;
 	unsigned long packets;
 
