@@ -28,25 +28,25 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-struct byte_packet_counter {
+typedef struct byte_packet_counter_s {
 	u_int32_t bytes;
 	u_int32_t packets;
-};
+} byte_packet_counter;
 
-struct ipstat_directional_counters {
+typedef struct ipstat_directional_counters_s {
 	byte_packet_counter gre;
 	byte_packet_counter ipip;
 	byte_packet_counter tcp;
 	byte_packet_counter udp;
 	byte_packet_counter ipsec;
 	byte_packet_counter other;
-};
+} ipstat_directional_counters;
 
-struct ipstat_counters {
+typedef struct ipstat_counters_s {
 	u_int32_t ip;
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
-};
+} ipstat_counters;
 
 uint16_t hostorder_ip;
 
