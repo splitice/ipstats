@@ -104,21 +104,21 @@ void output_stats(){
 	packet_output_count -= 100;
 	
 	for (int i = 0; i < hash_slots; i++) {
-		ipstat_counters* c = &hash_buckets[i];
+		ipstat_counters& c = hash_buckets[i];
 		
 		//empty bucket
-		if (c == 0)
+		if (c.ip == 0)
 			continue;
 
 		unsigned int ip = c->ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
 		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
-			c->in.tcp.packets, c->in.tcp.bytes, c->in.udp.packets, c->in.udp.bytes, c->in.gre.packets, c->in.gre.bytes,
-			c->in.ipip.packets, c->in.ipip.bytes, c->in.ipsec.packets, c->in.ipsec.bytes, c->in.other.packets, c->in.other.bytes);
+			c.in.tcp.packets, c.in.tcp.bytes, c.in.udp.packets, c.in.udp.bytes, c.in.gre.packets, c.in.gre.bytes,
+			c.in.ipip.packets, c.in.ipip.bytes, c.in.ipsec.packets, c.in.ipsec.bytes, c.in.other.packets, c.in.other.bytes);
 		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
-			c->out.tcp.packets, c->out.tcp.bytes, c->out.udp.packets, c->out.udp.bytes, c->out.gre.packets, c->out.gre.bytes,
-			c->out.ipip.packets, c->out.ipip.bytes, c->out.ipsec.packets, c->out.ipsec.bytes, c->out.other.packets, c->out.other.bytes);
+			c.out.tcp.packets, c.out.tcp.bytes, c.out.udp.packets, c.out.udp.bytes, c.out.gre.packets, c.out.gre.bytes,
+			c.out.ipip.packets, c.out.ipip.bytes, c.out.ipsec.packets, c.out.ipsec.bytes, c.out.other.packets, c.out.other.bytes);
 	}
 }
 
