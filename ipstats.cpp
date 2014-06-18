@@ -80,7 +80,7 @@ struct nread_ip {
 unsigned int packet_counter = 0;
 char errbuf[PCAP_ERRBUF_SIZE];
 unsigned int hash_key = 0;
-ipstat_counters hash_buckets[HASH_BUCKET_SLOTS];
+ipstat_counters* hash_buckets[HASH_BUCKET_SLOTS];
 std::vector<ipstat_counters*> counters;
 
 void output_stats(){
