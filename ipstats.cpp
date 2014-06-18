@@ -110,7 +110,7 @@ void output_stats(){
 		if (c.ip == 0)
 			continue;
 
-		unsigned int ip = c->ip;
+		u_int32_t ip = c.ip;
 
 		//IP TCP UDP GRE IPIP IPSEC OTHER
 		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
@@ -219,7 +219,7 @@ void my_callback(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	//else: dont care
 }
 
-void load_hash_buckets(u_int16_t num_counters, ipstat_counters** counters)
+void load_hash_buckets(u_int16_t num_counters, int* counters)
 {
 	bool loaded = false;
 
@@ -240,25 +240,27 @@ void load_hash_buckets(u_int16_t num_counters, ipstat_counters** counters)
 		}
 
 		//Zero buckets
-		memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
+		for (int i = hash_slots; i != 0; i--){
+			hash_buckets[i].ip = 0;
+		}
 
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
 			ipstat_counters* c = counters[i];
-			unsigned int addr_idx = (c->ip ^ hash_key) % hash_slots;
+			unsigned int addr_idx = (c ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip != 0){
 				loaded = false;
 				break;
 			}
-			hash_buckets[addr_idx].ip = c->ip;
+			hash_buckets[addr_idx].ip = c;
 		}
 	}
 }
 
 int load_devs(const char* name){
 	u_int16_t num_counters;
-	ipstat_counters** counters;
+	int* counters;
 
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
@@ -275,15 +277,13 @@ int load_devs(const char* name){
 					num_counters++;
 				}
 			}
-			hash_slots = num_counters * 3;
+			hash_slots = num_counters * 2.5;
 			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
 					unsigned int addr = ADDR_TO_UINT(((struct sockaddr_in*)a->addr)->sin_addr);
-					ipstat_counters* counter = new ipstat_counters();
-					counter->ip = addr;
-					counters[i] = counter;
+					counters[i] = addr;
 					i++;
 				}
 			}
