@@ -226,6 +226,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 	//Starting values
 	hash_key = 0x17ac;
 	hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
+	memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
 
 	//Loop until solution found
 	while (!loaded){
@@ -237,6 +238,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 			free(hash_buckets);
 			hash_slots++;
 			hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
+			memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
 		}
 
 		//Zero buckets
