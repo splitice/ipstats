@@ -278,7 +278,7 @@ int load_devs(const char* name){
 				}
 			}
 			hash_slots = num_counters * 2.5;
-			counters = (ipstat_counters**)malloc(sizeof(ipstat_counters*)* num_counters);
+			counters = (unsigned int*)malloc(sizeof(unsigned int*)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
