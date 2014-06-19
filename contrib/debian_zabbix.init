@@ -21,9 +21,9 @@ HOSTNAME=$(hostname --fqdn)
 #Can be set manually
 #INTERFACE=""
 INTERFACE=$(most_likely_interface)
-DAEMON_OPTS="-c 'ipstats eth1 | bash contrib/zabbix_formatter.sh $HOSTNAME | zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -'"
 NAME=ipstats
 DESC=ipstats
+FORMATTER_PATH="/etc/ipstats/zabbix_formatter.sh"
 
 test -x $DAEMON || exit 0
 
@@ -31,6 +31,9 @@ test -x $DAEMON || exit 0
 if [ -f /etc/default/ipstats ] ; then
 	. /etc/default/ipstats
 fi
+
+DAEMON_OPTS="-c 'ipstats $INTERFACE | bash \"$FORMATTER_PATH/zabbix_formatter.sh\" $HOSTNAME | zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -'"
+
 
 PIDFILE=/var/run/$NAME.pid
 
