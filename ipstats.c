@@ -32,11 +32,13 @@
 #include <sys/time.h>
 #include <stddef.h>
 
+/* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
 	u_int64_t bytes;
 	u_int32_t packets;
 } byte_packet_counter;
 
+/* Counters for bytes/packets tranferred in a direction */
 typedef struct ipstat_directional_counters_s {
 	byte_packet_counter gre;
 	byte_packet_counter ipip;
@@ -47,15 +49,14 @@ typedef struct ipstat_directional_counters_s {
 	byte_packet_counter other;
 } ipstat_directional_counters;
 
-typedef struct ipstat_counters_s {
+/* A statistical entry */
+typedef struct ipstat_entry_s {
 	u_int32_t ip;
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
-} ipstat_counters;
+} ipstat_entry;
 
-uint16_t hostorder_ip;
-
-
+//Structure of an IP packet
 struct nread_ip {
 	u_int8_t        ip_vhl;          /* header length, version    */
 #define IP_V(ip)    (((ip)->ip_vhl & 0xf0) >> 4)
@@ -73,12 +74,14 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
+//Packet helpers
 #define ADDR_TO_UINT(x) *(u_int32_t*)&(x)
+uint16_t hostorder_ip;//constant in host order
 
 //Hash lookup
 unsigned int hash_key = 0;
 unsigned int hash_slots;
-ipstat_counters* hash_buckets;
+ipstat_entry* hash_buckets;
 #define HASH_KEY_INIT 0x17ac
 
 //Packet counting
@@ -87,6 +90,7 @@ u_int16_t packet_output_count = 1;//Start by outputting empty counters after the
 unsigned int next_time = 0;
 #define TIME_INTERVAL 30
 
+/* Output stats */
 void output_stats(){
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -101,7 +105,7 @@ void output_stats(){
 	
 	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
 	for (int i = 0; i < hash_slots; i++) {
-		ipstat_counters& c = hash_buckets[i];
+		ipstat_entry& c = hash_buckets[i];
 		
 		//empty bucket
 		if (c.ip == 0)
@@ -121,11 +125,13 @@ void output_stats(){
 	}
 }
 
+/* Increment a counter */
 inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
 	counter.packets++;
 	counter.bytes += length;
 }
 
+/* Increment a counter for a protocol, in a direction */
 void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
@@ -153,6 +159,7 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter
 	}
 }
 
+/* Handle an IP packet */
 void ip_handler(const u_char* packet)
 {
 	const struct nread_ip* ip;   /* packet structure         */
@@ -166,12 +173,12 @@ void ip_handler(const u_char* packet)
 
 	if (version == 4){
 		u_int32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
-		ipstat_counters& c = hash_buckets[addr_idx];
+		ipstat_entry& c = hash_buckets[addr_idx];
 
 		if (c.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_src)){
 			//Not what we are after, try dst
 			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
-			ipstat_counters& c2 = hash_buckets[addr_idx];
+			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
 			if (c2.ip != ADDR_TO_UINT(ip->ip_dst) || c2.ip == 0){
@@ -187,7 +194,7 @@ void ip_handler(const u_char* packet)
 	}
 }
 
-
+/* Handle an ethernet packet */
 void ethernet_handler(const u_char* packet)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
@@ -203,19 +210,21 @@ void ethernet_handler(const u_char* packet)
 	//else: dont care
 }
 
+/* Handle an ethernet packet (libpcap callback) */
 void pcap_ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, const u_char* packet)
 {
 	ethernet_handler(packet);
 }
 
+/* Initialize hash buckets */
 void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 {
 	bool loaded = false;
 
 	//Starting values
 	hash_key = HASH_KEY_INIT;
-	hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
-	memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
+	hash_buckets = (ipstat_entry*)malloc(sizeof(ipstat_entry)*hash_slots);
+	memset(hash_buckets, 0, sizeof(ipstat_entry)* hash_slots);
 
 	//Loop until solution found
 	while (!loaded){
@@ -226,8 +235,8 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		if (hash_key == HASH_KEY_INIT){
 			free(hash_buckets);
 			hash_slots++;
-			hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
-			memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
+			hash_buckets = (ipstat_entry*)malloc(sizeof(ipstat_entry)*hash_slots);
+			memset(hash_buckets, 0, sizeof(ipstat_entry)* hash_slots);
 		}
 
 		//Zero buckets
@@ -249,6 +258,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 	}
 }
 
+/* Find our device, load addresses */
 bool load_devs(const char* name){
 	u_int16_t num_counters;
 	unsigned int* counters;
@@ -296,6 +306,7 @@ bool load_devs(const char* name){
 }
 
 #ifdef USE_PF_RING
+/* Procss packets using PF_RING */
 void run_pfring(const char* dev)
 {
 	u_int flags = PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP;
@@ -333,6 +344,7 @@ void run_pfring(const char* dev)
 	pfring_close(pd);
 }
 #else
+/* Process packets using pcap */
 void run_pcap(const char* dev)
 {
 	pcap_t* descr;
@@ -359,6 +371,7 @@ void run_pcap(const char* dev)
 }
 #endif
 
+/* It all starts here */
 int main(int argc, char **argv)
 {
 	char *dev;
