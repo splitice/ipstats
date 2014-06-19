@@ -11,8 +11,8 @@
 ### END INIT INFO
 
 function most_likely_interface {
-	# get the interface with the most aliases (eth0:{X})
-	ifconfig | grep "Link encap" | grep -v "lo" | awk '{print $1}' | awk -F':' '{print $1}' | uniq -c | sort -r | head -1 | xargs | cut -d" " -f2-
+        # get the interface with the most aliases (eth0:{X})
+        ifconfig | grep "Link encap" | grep -v "lo" | awk '{print $1}' | awk -F':' '{print $1}' | uniq -c | sort -r | head -1 | xargs | cut -d" " -f2-
 }
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
@@ -29,53 +29,51 @@ test -x $DAEMON || exit 0
 
 # Include ipstats defaults if available
 if [ -f /etc/default/ipstats ] ; then
-	. /etc/default/ipstats
+        . /etc/default/ipstats
 fi
 
-DAEMON_OPTS="-c 'ipstats $INTERFACE | bash \"$FORMATTER_PATH/zabbix_formatter.sh\" $HOSTNAME | zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -'"
-
-
+DAEMON_OPTS="/usr/sbin/ipstats $INTERFACE | /bin/bash '$FORMATTER_PATH' $HOSTNAME | /usr/bin/zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -"
 PIDFILE=/var/run/$NAME.pid
 
 set -e
 
 case "$1" in
   start)
-	echo -n "Starting $DESC: "
-	test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
-	start-stop-daemon -b -m --start --quiet --pidfile $PIDFILE \
-		--exec $DAEMON -- $DAEMON_OPTS
-	echo "$NAME."
-	;;
+        echo -n "Starting $DESC: "
+        test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
+        start-stop-daemon -m -b --quiet --start --pidfile $PIDFILE \
+                --exec $DAEMON -- -c "$DAEMON_OPTS"
+        echo "$NAME."
+        ;;
   stop)
-	echo -n "Stopping $DESC: "
-	start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE \
-		--exec $DAEMON
-	echo "$NAME."
-	;;
+        echo -n "Stopping $DESC: "
+        start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE \
+                --exec $DAEMON
+        echo "$NAME."
+        ;;
   force-reload)
-	test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
-	# check whether $DAEMON is running. If so, restart
-	start-stop-daemon --stop --test --quiet --pidfile \
-		$PIDFILE --exec $DAEMON \
-	&& $0 restart \
-	|| exit 0
-	;;
+        test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
+        # check whether $DAEMON is running. If so, restart
+        start-stop-daemon --stop --test --quiet --pidfile \
+                $PIDFILE --exec $DAEMON \
+        && $0 restart \
+        || exit 0
+        ;;
   restart)
-	test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
-	echo -n "Restarting $DESC: "
-	start-stop-daemon --stop --quiet --pidfile \
-		$PIDFILE --exec $DAEMON
-	sleep 1
-	start-stop-daemon -m -b --start --quiet --pidfile \
-		$PIDFILE --exec $DAEMON -- $DAEMON_OPTS
-	echo "$NAME."
-	;;
+        test -d ${ipstats_RUN_DIR:-/var/run/ipstats} || mkdir -p ${ipstats_RUN_DIR:-/var/run/ipstats}
+        echo -n "Restarting $DESC: "
+        start-stop-daemon --stop --quiet --pidfile \
+                $PIDFILE --exec $DAEMON
+        sleep 1
+        start-stop-daemon -m -b --start --quiet --pidfile \
+                $PIDFILE --exec $DAEMON -- -c "$DAEMON_OPTS"
+        echo "$NAME."
+        ;;
   *)
-	N=/etc/init.d/$NAME
-	echo "Usage: $N {start|stop|restart|force-reload}" >&2
-	exit 1
-	;;
+        N=/etc/init.d/$NAME
+        echo "Usage: $N {start|stop|restart|force-reload}" >&2
+        exit 1
+        ;;
 esac
 
 exit 0
