@@ -296,30 +296,7 @@ bool load_devs(const char* name){
 	return found;
 }
 
-void run_pcap(const char* dev)
-{
-	pcap_t* descr;
-
-	/* open device for reading */
-	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
-	if (descr == NULL)
-	{
-		printf("pcap_open_live(): %s\n", errbuf); exit(1);
-	}
-
-	pcap_setnonblock(descr, false, errbuf);
-
-	//pcap_setdirection(descr,PCAP_D_IN)
-
-	struct pcap_pkthdr* pkthdr;
-	const u_char* packet;
-
-	while (true)
-	{
-		pcap_dispatch(descr, 1000, pcap_ethernet_handler, NULL);
-	}
-}
-
+#ifdef USE_PF_RING
 void run_pfring(const char* dev)
 {
 	u_int flags = PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP;
@@ -349,6 +326,31 @@ void run_pfring(const char* dev)
 
 	pfring_close(pd);
 }
+#else
+void run_pcap(const char* dev)
+{
+	pcap_t* descr;
+
+	/* open device for reading */
+	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
+	if (descr == NULL)
+	{
+		printf("pcap_open_live(): %s\n", errbuf); exit(1);
+	}
+
+	pcap_setnonblock(descr, false, errbuf);
+
+	//pcap_setdirection(descr,PCAP_D_IN)
+
+	struct pcap_pkthdr* pkthdr;
+	const u_char* packet;
+
+	while (true)
+	{
+		pcap_dispatch(descr, 1000, pcap_ethernet_handler, NULL);
+	}
+}
+#endif
 
 int main(int argc, char **argv)
 {
