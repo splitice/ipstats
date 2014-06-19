@@ -33,7 +33,7 @@
 #include <stddef.h>
 
 typedef struct byte_packet_counter_s {
-	u_int32_t bytes;
+	u_int64_t bytes;
 	u_int32_t packets;
 } byte_packet_counter;
 
