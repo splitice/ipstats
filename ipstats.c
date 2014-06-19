@@ -177,7 +177,7 @@ void ip_handler(const u_char* packet)
 			ipstat_counters& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
-			if (c.ip != ADDR_TO_UINT(ip->ip_dst) || c2.ip == 0){
+			if (c2.ip != ADDR_TO_UINT(ip->ip_dst) || c2.ip == 0){
 				return;
 			}
 
