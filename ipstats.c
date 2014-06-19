@@ -171,7 +171,7 @@ void ip_handler(const u_char* packet)
 		u_int32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
 		ipstat_counters& c = hash_buckets[addr_idx];
 
-		if (c.ip == 0){
+		if (c.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_src)){
 			//Not what we are after, try dst
 			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
 			ipstat_counters& c2 = hash_buckets[addr_idx];
@@ -181,16 +181,11 @@ void ip_handler(const u_char* packet)
 				return;
 			}
 
-			increment_direction(ip->ip_p, c2.out, len);
+			increment_direction(ip->ip_p, c2.in, len);
 		}
 		else
 		{
-			//Check non-hashed ip
-			if (c.ip != ADDR_TO_UINT(ip->ip_src)){
-				return;
-			}
-
-			increment_direction(ip->ip_p, c.in, len);
+			increment_direction(ip->ip_p, c.out, len);
 		}
 	}
 }
