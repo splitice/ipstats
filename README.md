@@ -23,5 +23,5 @@ ipstats can be compiled using the included ```build.sh```, pf_ring support can b
 # CPU Usage.
 As measured on a Intel(R) Atom(TM) CPU D525   @ 1.80GHz
 
- * __libpcap 1.0+: __~10% CPU usage at 20mbit
- * __pf_ring: __<0.5% CPU usage at 20mbit
+ * __libpcap 1.0+:__ ~10% CPU usage at 20mbit
+ * __pf_ring:__ <0.5% CPU usage at 20mbit
