@@ -1,3 +1,4 @@
+#define USE_PF_RING
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -20,6 +21,9 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <pcap.h>
+#ifdef USE_PF_RING
+#include <pfring.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +73,7 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
-#define ADDR_TO_UINT(x) *(u32_t*)&(x)
+#define ADDR_TO_UINT(x) *(u_int32_t*)&(x)
 //#define ADDR_TO_UINT(x) x
 
 //Hash lookup
@@ -80,9 +84,9 @@ ipstat_counters* hash_buckets;
 
 //Packet counting
 u_int16_t packet_counter = 0;
-u_int16_t packet_output_count = 0;
+u_int16_t packet_output_count = 10;
 unsigned int next_time = 0;
-#define TIME_INTERVAL 10
+#define TIME_INTERVAL 1
 
 //PCAP
 char errbuf[PCAP_ERRBUF_SIZE];
@@ -147,7 +151,7 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter
 	}
 }
 
-void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
+void ip_handler(const u_char* packet)
 {
 	const struct nread_ip* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
@@ -159,7 +163,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		u32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
+		u_int32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
 		ipstat_counters& c = hash_buckets[addr_idx];
 
 		if (c.ip == 0){
@@ -187,12 +191,12 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 }
 
 
-void ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, const u_char* packet)
+void ethernet_handler(const u_char* packet)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 
 	if (eptr->ether_type == hostorder_ip) {
-		ip_handler(pkthdr, packet);
+		ip_handler(packet);
 
 		if ((++packet_counter) == packet_output_count){
 			output_stats();
@@ -200,6 +204,11 @@ void ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, const u_
 		}
 	}
 	//else: dont care
+}
+
+void pcap_ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, const u_char* packet)
+{
+	ethernet_handler(packet);
 }
 
 void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
@@ -243,9 +252,10 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 	}
 }
 
-int load_devs(const char* name){
+bool load_devs(const char* name){
 	u_int16_t num_counters;
 	unsigned int* counters;
+	bool found = false;
 
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
@@ -272,30 +282,24 @@ int load_devs(const char* name){
 					i++;
 				}
 			}
+			found = true;
 			break;
 		}
 	}
 
 	pcap_freealldevs(alldevs);
 
-	load_hash_buckets(num_counters, counters);
+	if (found){
+		load_hash_buckets(num_counters, counters);
 
-	free(counters);
+		free(counters);
+	}
+	return found;
 }
 
-int main(int argc, char **argv)
+void run_pcap(const char* dev)
 {
-	int i;
-	char *dev;
 	pcap_t* descr;
-
-	if (argc != 2){ printf("Usage: %s device\n", argv[0]); return 0; }
-
-	/* grab a device to peak into... */
-	dev = argv[1];
-	load_devs(dev);
-
-	printf("# Init complete. Starting\n");
 
 	/* open device for reading */
 	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
@@ -308,16 +312,70 @@ int main(int argc, char **argv)
 
 	//pcap_setdirection(descr,PCAP_D_IN)
 
-	hostorder_ip = ntohs(ETHERTYPE_IP);
-
 	struct pcap_pkthdr* pkthdr;
 	const u_char* packet;
 
 	while (true)
 	{
-		pcap_dispatch(descr, 1000, ethernet_handler, NULL);
+		pcap_dispatch(descr, 1000, pcap_ethernet_handler, NULL);
+	}
+}
+
+void run_pfring(const char* dev)
+{
+	u_int flags = PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP;
+	u_char* buffer;
+	pfring_pkthdr hdr;
+	int rc;
+
+	pfring* pd = pfring_open(dev, 200, flags);
+	if (pd == NULL){
+		printf("A PFRING error occured while opening: %s\n", strerror(errno));
 	}
 
-	fprintf(stdout, "\nDone. Closing!\n");
+	pfring_enable_ring(pd);
+
+	/*int pfring_recv(pfring *ring, u_char** buffer, u_int buffer_len, struct pfring_pkthdr *hdr,
+ u_int8_t wait_for_incoming_packet)*/
+	while (true){
+		rc = pfring_recv(pd, &buffer, 0, &hdr, 1);
+		if (rc < 0){
+			printf("A PFRING error occured while recving: %s rc:%d\n", strerror(errno), rc);
+			return;
+		}
+		if (rc > 0){
+			ethernet_handler(buffer);
+		}
+	}
+
+	pfring_close(pd);
+}
+
+int main(int argc, char **argv)
+{
+	char *dev;
+
+	if (argc != 2){ printf("Usage: %s device\n", argv[0]); return 1; }
+
+	//ethernet type
+	hostorder_ip = ntohs(ETHERTYPE_IP);
+
+	/* grab a device to peak into... */
+	dev = argv[1];
+	if (!load_devs(dev)){
+		printf("# Init failed, device not found.\n");
+		return 1;
+	}
+
+	printf("# Init complete. Starting\n");
+
+#ifdef USE_PF_RING
+	run_pfring(dev);
+#else
+	run_pcap(dev);
+#endif
+
+	printf("\nDone. Closing!\n");
+
 	return 0;
 }
