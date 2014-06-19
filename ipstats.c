@@ -1,4 +1,3 @@
-#define USE_PF_RING
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
