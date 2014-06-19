@@ -306,7 +306,7 @@ bool load_devs(const char* name){
 }
 
 #ifdef USE_PF_RING
-/* Procss packets using PF_RING */
+/* Process packets using PF_RING */
 void run_pfring(const char* dev)
 {
 	u_int flags = PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP;
