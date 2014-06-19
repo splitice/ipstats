@@ -102,7 +102,7 @@ void output_stats(){
 	next_time = tv.tv_sec + TIME_INTERVAL;
 	packet_output_count -= 100;
 	
-	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER");
+	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
 	for (int i = 0; i < hash_slots; i++) {
 		ipstat_counters& c = hash_buckets[i];
 		
