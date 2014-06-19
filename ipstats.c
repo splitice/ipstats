@@ -312,21 +312,28 @@ void run_pfring(const char* dev)
 
 	pfring* pd = pfring_open(dev, 200, flags);
 	if (pd == NULL){
-		printf("#Error: A PFRING error occured while opening: %s\n", strerror(errno));
+		printf("#Error: A PF_RING error occured while opening: %s\n", strerror(errno));
 	}
 
-	pfring_enable_ring(pd);
+	rc = pfring_set_direction(pd, rx_and_tx_direction);
+	if(rc < 0){
+		printf("#Error: A PF_RING error occured while setting direction: %s rc:%d\n", strerror(errno), rc);
+		return;
+	}
 
-	/*int pfring_recv(pfring *ring, u_char** buffer, u_int buffer_len, struct pfring_pkthdr *hdr,
- u_int8_t wait_for_incoming_packet)*/
+	rc = pfring_enable_ring(pd);
+	if (rc < 0){
+		printf("#Error: A PF_RING error occured while enabling: %s rc:%d\n", strerror(errno), rc);
+		return;
+	}
+
 	while (true){
 		rc = pfring_recv(pd, &buffer, 0, &hdr, 1);
-		if (rc < 0){
-			printf("#Error: A PFRING error occured while recving: %s rc:%d\n", strerror(errno), rc);
-			return;
-		}
 		if (rc > 0){
 			ethernet_handler(buffer);
+		}else if (rc < 0){
+			printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
+			return;
 		}
 	}
 
