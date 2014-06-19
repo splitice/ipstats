@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <stddef.h>
+#include <assert.h>
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
