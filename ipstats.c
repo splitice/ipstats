@@ -27,6 +27,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <stddef.h>
 
 typedef struct byte_packet_counter_s {
 	u_int32_t bytes;
@@ -68,7 +69,7 @@ struct nread_ip {
 	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
 };
 
-#define ADDR_TO_UINT(x) *(unsigned int*)&(x)
+#define ADDR_TO_UINT(x) *(u32_t*)&(x)
 //#define ADDR_TO_UINT(x) x
 
 //Hash lookup
@@ -122,7 +123,7 @@ inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
 	counter.bytes += length;
 }
 
-inline void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter, u_int16_t length){
+void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
 		increment_counter(counter.tcp, length);
@@ -158,7 +159,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		unsigned int addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
+		u32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
 		ipstat_counters& c = hash_buckets[addr_idx];
 
 		if (c.ip == 0){
@@ -167,7 +168,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 			ipstat_counters& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
-			if (c2.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_dst)){
+			if (c.ip != ADDR_TO_UINT(ip->ip_dst) || c2.ip == 0){
 				return;
 			}
 
@@ -186,7 +187,7 @@ void ip_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
 }
 
 
-void ethernet_handler(const struct pcap_pkthdr* pkthdr, const u_char* packet)
+void ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, const u_char* packet)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 
@@ -297,7 +298,7 @@ int main(int argc, char **argv)
 	printf("# Init complete. Starting\n");
 
 	/* open device for reading */
-	descr = pcap_open_live(dev, 200, 0, 1000, errbuf);
+	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
 	if (descr == NULL)
 	{
 		printf("pcap_open_live(): %s\n", errbuf); exit(1);
@@ -312,10 +313,9 @@ int main(int argc, char **argv)
 	struct pcap_pkthdr* pkthdr;
 	const u_char* packet;
 
-	int res;
-	while ((res = pcap_next_ex(descr, &pkthdr, &packet)) >= 0)
+	while (true)
 	{
-		ethernet_handler(pkthdr, packet);
+		pcap_dispatch(descr, 1000, ethernet_handler, NULL);
 	}
 
 	fprintf(stdout, "\nDone. Closing!\n");
