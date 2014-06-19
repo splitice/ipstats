@@ -240,7 +240,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		}
 
 		//Zero buckets
-		for (int i = hash_slots; i != 0; i--){
+		for (int i = hash_slots - 1; i != 0; i--){
 			hash_buckets[i].ip = 0;
 		}
 
@@ -286,6 +286,7 @@ bool load_devs(const char* name){
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
 				if (a->addr->sa_family == AF_INET){
 					unsigned int addr = ADDR_TO_UINT(((struct sockaddr_in*)a->addr)->sin_addr);
+					assert(i <= num_counters);
 					counters[i] = addr;
 					i++;
 				}
