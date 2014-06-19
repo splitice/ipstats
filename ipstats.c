@@ -265,7 +265,7 @@ bool load_devs(const char* name){
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
 	if (status != 0) {
-		printf("%s\n", errbuf);
+		printf("#Error: pcap_findalldevs - %s\n", errbuf);
 		return 1;
 	}
 
@@ -312,7 +312,7 @@ void run_pfring(const char* dev)
 
 	pfring* pd = pfring_open(dev, 200, flags);
 	if (pd == NULL){
-		printf("A PFRING error occured while opening: %s\n", strerror(errno));
+		printf("#Error: A PFRING error occured while opening: %s\n", strerror(errno));
 	}
 
 	pfring_enable_ring(pd);
@@ -322,7 +322,7 @@ void run_pfring(const char* dev)
 	while (true){
 		rc = pfring_recv(pd, &buffer, 0, &hdr, 1);
 		if (rc < 0){
-			printf("A PFRING error occured while recving: %s rc:%d\n", strerror(errno), rc);
+			printf("#Error: A PFRING error occured while recving: %s rc:%d\n", strerror(errno), rc);
 			return;
 		}
 		if (rc > 0){
@@ -341,7 +341,7 @@ void run_pcap(const char* dev)
 	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
 	if (descr == NULL)
 	{
-		printf("pcap_open_live(): %s\n", errbuf); exit(1);
+		printf("#Error: pcap_open_live(): %s\n", errbuf); exit(1);
 	}
 
 	pcap_setnonblock(descr, false, errbuf);
@@ -381,8 +381,6 @@ int main(int argc, char **argv)
 #else
 	run_pcap(dev);
 #endif
-
-	printf("\nDone. Closing!\n");
 
 	return 0;
 }
