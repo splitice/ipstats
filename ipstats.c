@@ -42,6 +42,7 @@ typedef struct ipstat_directional_counters_s {
 	byte_packet_counter ipip;
 	byte_packet_counter tcp;
 	byte_packet_counter udp;
+	byte_packet_counter icmp;
 	byte_packet_counter ipsec;
 	byte_packet_counter other;
 } ipstat_directional_counters;
@@ -73,7 +74,6 @@ struct nread_ip {
 };
 
 #define ADDR_TO_UINT(x) *(u_int32_t*)&(x)
-//#define ADDR_TO_UINT(x) x
 
 //Hash lookup
 unsigned int hash_key = 0;
@@ -82,10 +82,10 @@ ipstat_counters* hash_buckets;
 
 
 //Packet counting
-u_int16_t packet_counter = 0;
-u_int16_t packet_output_count = 10;
+u_int16_t packet_counter = 0; 
+u_int16_t packet_output_count = 1;//Start by outputting counters after the first packet
 unsigned int next_time = 0;
-#define TIME_INTERVAL 1
+#define TIME_INTERVAL 10
 
 //PCAP
 char errbuf[PCAP_ERRBUF_SIZE];
@@ -102,6 +102,7 @@ void output_stats(){
 	next_time = tv.tv_sec + TIME_INTERVAL;
 	packet_output_count -= 100;
 	
+	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER");
 	for (int i = 0; i < hash_slots; i++) {
 		ipstat_counters& c = hash_buckets[i];
 		
@@ -111,13 +112,15 @@ void output_stats(){
 
 		u_int32_t ip = c.ip;
 
-		//IP TCP UDP GRE IPIP IPSEC OTHER
-		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
+		//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
+		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
 			c.in.tcp.packets, c.in.tcp.bytes, c.in.udp.packets, c.in.udp.bytes, c.in.gre.packets, c.in.gre.bytes,
-			c.in.ipip.packets, c.in.ipip.bytes, c.in.ipsec.packets, c.in.ipsec.bytes, c.in.other.packets, c.in.other.bytes);
-		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
+			c.in.ipip.packets, c.in.ipip.bytes, c.in.icmp.packets, c.in.icmp.bytes, c.in.ipsec.packets, c.in.ipsec.bytes,
+			c.in.other.packets, c.in.other.bytes);
+		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
 			c.out.tcp.packets, c.out.tcp.bytes, c.out.udp.packets, c.out.udp.bytes, c.out.gre.packets, c.out.gre.bytes,
-			c.out.ipip.packets, c.out.ipip.bytes, c.out.ipsec.packets, c.out.ipsec.bytes, c.out.other.packets, c.out.other.bytes);
+			c.out.ipip.packets, c.out.ipip.bytes, c.out.icmp.packets, c.out.icmp.bytes, c.out.ipsec.packets, c.out.ipsec.bytes,
+			c.out.other.packets, c.out.other.bytes);
 	}
 }
 
@@ -139,6 +142,9 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter
 		break;
 	case IPPROTO_IPIP:
 		increment_counter(counter.ipip, length);
+		break;
+	case IPPROTO_ICMP:
+		increment_counter(counter.icmp, length);
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
