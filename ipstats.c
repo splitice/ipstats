@@ -79,16 +79,13 @@ struct nread_ip {
 unsigned int hash_key = 0;
 unsigned int hash_slots;
 ipstat_counters* hash_buckets;
-
+#define HASH_KEY_INIT 0x17ac
 
 //Packet counting
 u_int16_t packet_counter = 0; 
-u_int16_t packet_output_count = 1;//Start by outputting counters after the first packet
+u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
 unsigned int next_time = 0;
-#define TIME_INTERVAL 10
-
-//PCAP
-char errbuf[PCAP_ERRBUF_SIZE];
+#define TIME_INTERVAL 
 
 void output_stats(){
 	struct timeval tv;
@@ -216,7 +213,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 	bool loaded = false;
 
 	//Starting values
-	hash_key = 0x17ac;
+	hash_key = HASH_KEY_INIT;
 	hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
 	memset(hash_buckets, 0, sizeof(ipstat_counters)* hash_slots);
 
@@ -226,7 +223,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		hash_key++;
 
 		//overflowed, increase slots.
-		if (hash_key == 0x17ac){
+		if (hash_key == HASH_KEY_INIT){
 			free(hash_buckets);
 			hash_slots++;
 			hash_buckets = (ipstat_counters*)malloc(sizeof(ipstat_counters)*hash_slots);
@@ -256,6 +253,7 @@ bool load_devs(const char* name){
 	u_int16_t num_counters;
 	unsigned int* counters;
 	bool found = false;
+	char errbuf[PCAP_ERRBUF_SIZE];
 
 	pcap_if_t *alldevs;
 	int status = pcap_findalldevs(&alldevs, errbuf);
@@ -338,6 +336,7 @@ void run_pfring(const char* dev)
 void run_pcap(const char* dev)
 {
 	pcap_t* descr;
+	char errbuf[PCAP_ERRBUF_SIZE];
 
 	/* open device for reading */
 	descr = pcap_open_live(dev, 100, 0, 1000, errbuf);
