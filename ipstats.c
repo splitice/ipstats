@@ -85,7 +85,7 @@ ipstat_counters* hash_buckets;
 u_int16_t packet_counter = 0; 
 u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
 unsigned int next_time = 0;
-#define TIME_INTERVAL 
+#define TIME_INTERVAL 30
 
 void output_stats(){
 	struct timeval tv;
