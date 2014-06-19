@@ -1,5 +1,5 @@
 #!/bin/bash
-#Usage: ./ipstats eth1 | bash contrib/zabbix_formatter.sh SERVER | zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -
+#Usage: ipstats eth1 | bash contrib/zabbix_formatter.sh SERVER | zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -
 
 HOST="$1"
 
