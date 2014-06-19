@@ -7,3 +7,6 @@ if [[ $1 == "pfring" ]]; then
 fi
 
 g++ ipstats.c $COMPILE_OPTIONS -O3 -o ipstats
+
+mv ipstats /usr/sbin/ipstats
+chmod +x /usr/sbin/ipstats
