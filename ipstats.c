@@ -91,6 +91,15 @@ u_int16_t packet_output_count = 1;//Start by outputting empty counters after the
 unsigned int next_time = 0;
 #define TIME_INTERVAL 30
 
+/* Hash function for integer distribution */
+unsigned int hash(unsigned int x) {
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = ((x >> 16) ^ x);
+	return x;
+}
+
+
 /* Output stats */
 void output_stats(){
 	struct timeval tv;
@@ -173,12 +182,12 @@ void ip_handler(const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		u_int32_t addr_idx = (ADDR_TO_UINT(ip->ip_src) ^ hash_key) % hash_slots;
+		u_int32_t addr_idx = (hash(ADDR_TO_UINT(ip->ip_src)) ^ hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
 		if (c.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_src)){
 			//Not what we are after, try dst
-			addr_idx = (ADDR_TO_UINT(ip->ip_dst) ^ hash_key) % hash_slots;
+			addr_idx = (hash(ADDR_TO_UINT(ip->ip_dst)) ^ hash_key) % hash_slots;
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
@@ -216,7 +225,6 @@ void pcap_ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, con
 {
 	ethernet_handler(packet);
 }
-
 /* Initialize hash buckets */
 void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 {
@@ -249,7 +257,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		loaded = true;
 		for (int i = num_counters; i != 0; i--) {
 			unsigned int c = counters[i];
-			unsigned int addr_idx = (c ^ hash_key) % hash_slots;
+			unsigned int addr_idx = hash(c ^ hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip != 0){
 				loaded = false;
 				break;
