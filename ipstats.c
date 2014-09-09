@@ -249,7 +249,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		}
 
 		//Zero buckets
-		for (int i = hash_slots - 1; i != 0; i--){
+		for (int i = 0; i < hash_slots; i++){
 			hash_buckets[i].ip = 0;
 		}
 
@@ -289,7 +289,7 @@ bool load_devs(const char* name){
 					num_counters++;
 				}
 			}
-			hash_slots = num_counters * 2.5;
+			hash_slots = num_counters * 12;
 			counters = (unsigned int*)malloc(sizeof(unsigned int)* num_counters);
 			int i = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
