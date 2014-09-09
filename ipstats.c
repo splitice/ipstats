@@ -80,10 +80,10 @@ struct nread_ip {
 uint16_t hostorder_ip;//constant in host order
 
 //Hash lookup
-unsigned int hash_key = 0;
+#define HASH_KEY_INIT 1
+unsigned int hash_key = HASH_KEY_INIT;
 unsigned int hash_slots;
 ipstat_entry* hash_buckets;
-#define HASH_KEY_INIT 0x17ac
 
 //Packet counting
 u_int16_t packet_counter = 0; 
@@ -182,12 +182,12 @@ void ip_handler(const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		u_int32_t addr_idx = (hash(ADDR_TO_UINT(ip->ip_src)) ^ hash_key) % hash_slots;
+		u_int32_t addr_idx = (hash(ADDR_TO_UINT(ip->ip_src)) * hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
 		if (c.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_src)){
 			//Not what we are after, try dst
-			addr_idx = (hash(ADDR_TO_UINT(ip->ip_dst)) ^ hash_key) % hash_slots;
+			addr_idx = (hash(ADDR_TO_UINT(ip->ip_dst)) * hash_key) % hash_slots;
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
@@ -257,7 +257,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 		loaded = true;
 		for (int i = num_counters; i != 0; i--) {
 			unsigned int c = counters[i];
-			unsigned int addr_idx = hash(c ^ hash_key) % hash_slots;
+			unsigned int addr_idx = hash(c) * hash_key % hash_slots;
 			if (hash_buckets[addr_idx].ip != 0){
 				loaded = false;
 				break;
