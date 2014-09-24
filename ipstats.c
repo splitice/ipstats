@@ -108,10 +108,13 @@ void output_stats(){
 		packet_output_count += 100;
 		return;
 	}
+	else{
+		packet_output_count -= 50;
+	}
 
 	//Next time to do work
 	next_time = tv.tv_sec + TIME_INTERVAL;
-	packet_output_count -= 100;
+	packet_counter = 0;
 	
 	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
 	for (int i = 0; i < hash_slots; i++) {
@@ -214,7 +217,6 @@ void ethernet_handler(const u_char* packet)
 
 		if ((++packet_counter) == packet_output_count){
 			output_stats();
-			packet_counter = 0;
 		}
 	}
 	//else: dont care
