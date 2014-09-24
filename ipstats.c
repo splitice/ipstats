@@ -116,7 +116,10 @@ void output_stats(){
 	next_time = tv.tv_sec + TIME_INTERVAL;
 	packet_counter = 0;
 	
-	printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
+	int written = printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
+	if (written < 0){
+		exit(2);
+	}
 	for (int i = 0; i < hash_slots; i++) {
 		ipstat_entry& c = hash_buckets[i];
 		
@@ -400,6 +403,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	setvbuf(stdout, NULL, _IONBF, 0);
 	printf("# Init complete. Starting\n");
 
 #ifdef USE_PF_RING
