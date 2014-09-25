@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 ### BEGIN INIT INFO
 # Provides:          ipstats
@@ -32,7 +32,7 @@ if [ -f /etc/default/ipstats ] ; then
         . /etc/default/ipstats
 fi
 
-DAEMON_OPTS="/usr/sbin/ipstats $INTERFACE | /bin/bash '$FORMATTER_PATH' $HOSTNAME | /usr/bin/zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -i -"
+DAEMON_OPTS="/usr/sbin/ipstats $INTERFACE | /bin/bash '$FORMATTER_PATH' $HOSTNAME"
 PIDFILE=/var/run/$NAME.pid
 
 set -e
