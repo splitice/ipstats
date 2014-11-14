@@ -89,7 +89,15 @@ ipstat_entry* hash_buckets;
 u_int16_t packet_counter = 0; 
 u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
 unsigned int next_time = 0;
+
 #define TIME_INTERVAL 30
+#define PACKET_SAMPLING_RATE 5
+
+#ifdef PACKET_SAMPLING_RATE
+#define PACKET_INCREMENT PACKET_SAMPLING_RATE
+#else
+#define PACKET_INCREMENT 1
+#endif
 
 /* Hash function for integer distribution */
 unsigned int hash(unsigned int x) {
@@ -143,8 +151,8 @@ void output_stats(){
 
 /* Increment a counter */
 inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
-	counter.packets++;
-	counter.bytes += length;
+	counter.packets += PACKET_INCREMENT;
+	counter.bytes += (length * PACKET_INCREMENT);
 }
 
 /* Increment a counter for a protocol, in a direction */
@@ -217,8 +225,8 @@ void ethernet_handler(const u_char* packet)
 
 	if (eptr->ether_type == hostorder_ip) {
 		ip_handler(packet);
-
-		if ((++packet_counter) == packet_output_count){
+		packet_counter += PACKET_SAMPLING_RATE;
+		if ((packet_counter >= packet_output_count){
 			output_stats();
 		}
 	}
@@ -345,6 +353,22 @@ void run_pfring(const char* dev)
 		printf("#Error: A PF_RING error occured while enabling: %s rc:%d\n", strerror(errno), rc);
 		return;
 	}
+
+	rc = pfring_set_poll_watermark(pd, 2048);
+	if (rc < 0){
+		printf("#Error: A PF_RING error occured while setting the watermark: %s rc:%d\n", strerror(errno), rc);
+		return;
+	}
+
+	pfring_set_poll_duration(pd, 1000);
+
+#ifdef PACKET_SAMPLING_RATE
+	rc = pfring_set_sampling_rate(pd, PACKET_SAMPLING_RATE);
+	if (rc < 0){
+		printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+		return;
+	}
+#endif
 
 	while (true){
 		rc = pfring_recv(pd, &buffer, 0, &hdr, 1);
