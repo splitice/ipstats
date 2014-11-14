@@ -226,7 +226,7 @@ void ethernet_handler(const u_char* packet)
 	if (eptr->ether_type == hostorder_ip) {
 		ip_handler(packet);
 		packet_counter += PACKET_SAMPLING_RATE;
-		if ((packet_counter >= packet_output_count){
+		if (packet_counter >= packet_output_count){
 			output_stats();
 		}
 	}
