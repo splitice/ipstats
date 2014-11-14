@@ -1,13 +1,21 @@
+#!/bin/bash
+
 OUT=$(mktemp -d)
 cd "$OUT"
 
-apt-get install build-essential libnuma-dev subversion linux-headers-$(uname -r) --force-yes -y
+if [[ -z "$1" ]]; then
+	kernel=$(uname -r)
+else
+	kernel="$1"
+fi
+
+apt-get install build-essential libnuma-dev subversion linux-headers-$kernel --force-yes -y
 
 svn co https://svn.ntop.org/svn/ntop/trunk/PF_RING/ PF_RING
 
 cd PF_RING/kernel
-make
-make install
+BUILD_KERNEL=$kernel make
+BUILD_KERNEL=$kernel make install
 
 cd "$OUT"
 
