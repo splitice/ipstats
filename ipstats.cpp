@@ -81,10 +81,8 @@ struct nread_ipv4 {
 
 struct ipv6_header
 {
-	unsigned int
-		version : 4,
-		traffic_class : 8,
-		flow_label : 20;
+	uint32_t        ip_vtcfl;	/* version then traffic class and flow label */
+#define IP6_V(ip)		(ntohl((ip)->ip_vtcfl) >> 28)
 	uint16_t length;
 	uint8_t  next_header;
 	uint8_t  hop_limit;
@@ -262,7 +260,7 @@ void ipv6_handler(const u_char* packet)
 	ip = (struct ipv6_header*)(packet + sizeof(struct ether_header));
 
 	len = ntohs(ip->length); /* get packet length */
-	version = ip->version;          /* get ip version    */
+	version = IP6_V(ip);          /* get ip version    */
 
 	if (version == 6){
 		u_int32_t addr_idx = ipv6_hash(ip->src, hash_key) % hash_slots;
