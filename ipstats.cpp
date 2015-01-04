@@ -76,7 +76,7 @@ struct nread_ipv4 {
 	u_int8_t        ip_ttl;          /* time to live              */
 	u_int8_t        ip_p;            /* protocol                  */
 	u_int16_t       ip_sum;          /* checksum                  */
-	struct  ipv4 ip_src, ip_dst;  /* source and dest address   */
+	struct  ipv4_address ip_src, ip_dst;  /* source and dest address   */
 };
 
 struct ipv6_header
@@ -86,8 +86,8 @@ struct ipv6_header
 	uint16_t length;
 	uint8_t  next_header;
 	uint8_t  hop_limit;
-	struct ipv6 src;
-	struct ipv6 dst;
+	struct ipv6_address src;
+	struct ipv6_address dst;
 };
 
 //Packet helpers
@@ -115,7 +115,7 @@ unsigned int next_time = 0;
 #endif
 
 /* Hash function for integer distribution */
-uint32_t ipv4_hash(ipv4 ip, uint32_t hash_key) {
+uint32_t ipv4_hash(ipv4_address ip, uint32_t hash_key) {
 	uint32_t x = *(uint32_t*)&ip;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -123,9 +123,9 @@ uint32_t ipv4_hash(ipv4 ip, uint32_t hash_key) {
 	return x * hash_key;
 }
 
-uint32_t ipv6_hash(const ipv6& ip, uint32_t hash_key){
+uint32_t ipv6_hash(const ipv6_address& ip, uint32_t hash_key){
 	uint32_t ret;
-	MurmurHash3_x86_32(&ip, sizeof(ipv6), hash_key, &ret);
+	MurmurHash3_x86_32(&ip, sizeof(ipv6_address), hash_key, &ret);
 	return ret;
 }
 
@@ -231,14 +231,14 @@ void ipv4_handler(const u_char* packet)
 		u_int32_t addr_idx = ipv4_hash(ip->ip_src, hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
-		if (c.ip.ver != 4 || memcmp(&c.ip.v4,&ip->ip_src, sizeof(ipv4)) != 0){
+		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->ip_src, sizeof(ipv4_address)) != 0){
 			//Not what we are after, try dst
 			addr_idx = ipv4_hash(ip->ip_dst, hash_key) % hash_slots;
 
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
-			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->ip_dst, sizeof(ipv4)) != 0){
+			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->ip_dst, sizeof(ipv4_address)) != 0){
 				return;
 			}
 
@@ -266,14 +266,14 @@ void ipv6_handler(const u_char* packet)
 		u_int32_t addr_idx = ipv6_hash(ip->src, hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
-		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->src, sizeof(ipv6)) != 0){
+		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->src, sizeof(ipv6_address)) != 0){
 			//Not what we are after, try dst
 			addr_idx = ipv6_hash(ip->dst, hash_key) % hash_slots;
 
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 
 			//Check non-hashed ip and empty slot
-			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->dst, sizeof(ipv6)) != 0){
+			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->dst, sizeof(ipv6_address)) != 0){
 				return;
 			}
 

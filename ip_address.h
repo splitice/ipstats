@@ -3,13 +3,13 @@
 #include <stdint.h>
 
 /* IPv4 or IPv6 address */
-struct ipv4 {
+struct ipv4_address {
 	uint8_t byte1;
 	uint8_t byte2;
 	uint8_t byte3;
 	uint8_t byte4;
 };
-struct ipv6 {
+struct ipv6_address {
 	uint8_t byte1;
 	uint8_t byte2;
 	uint8_t byte3;
@@ -30,8 +30,8 @@ struct ipv6 {
 struct ip_address
 {
 	union {
-		struct ipv4 v4;
-		struct ipv6 v6;
+		struct ipv4_address v4;
+		struct ipv6_address v6;
 	};
 	uint8_t ver;
 };
