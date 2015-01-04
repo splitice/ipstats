@@ -35,6 +35,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include "ip_address.h"
+#include "MurmurHash3.h"
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
@@ -92,8 +93,6 @@ struct ipv6_header
 };
 
 //Packet helpers
-#define ADDR_TO_UINT(x) *(u_int32_t*)&(x)
-#define ADDR6_TO_UINT(x) *(u_int32_t*)&(x)//todo
 uint16_t hostorder_ipv4;
 uint16_t hostorder_ipv6;
 
@@ -118,24 +117,25 @@ unsigned int next_time = 0;
 #endif
 
 /* Hash function for integer distribution */
-uint32_t hash(uint32_t x) {
-	x = ((x >> 16) ^ x) * 0x45d9f3b;
+uint32_t ipv4_hash(ipv4 ip, uint32_t hash_key) {
+	uint32_t x = ((x >> 16) ^ *(uint32_t*)&ip) * 0x45d9f3b;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x);
-	return x;
+	return x * hash_key;
 }
 
-uint32_t ip_hash(struct ip_address& ip, uint32_t ipv6_key){
+uint32_t ipv6_hash(const ipv6& ip, uint32_t hash_key){
+	uint32_t ret;
+	MurmurHash3_x86_32(&ip, sizeof(ipv6), hash_key, &ret);
+	return ret;
+}
+
+uint32_t ip_hash(const struct ip_address& ip, uint32_t hash_key){
 	if (ip.ver == 4){
-		return hash(*(uint32_t*)&ip.v4);
+		return ipv4_hash(ip.v4, hash_key);
 	}
 	else if (ip.ver == 6){
-		uint32_t a = hash(*(uint32_t*)&ip.v6);
-		uint32_t b = hash(*(uint32_t*)(&ip.v6 + 4)) * ipv6_key;
-		uint32_t c = hash(*(uint32_t*)(&ip.v6 + 8)) + ipv6_key;
-		uint32_t d = hash(*(uint32_t*)(&ip.v6 + 12)) * ipv6_key;
-
-		return a ^ b ^ c ^ d;
+		return ipv6_hash(ip.v6, hash_key);
 	}
 	return 0;
 }
@@ -229,12 +229,12 @@ void ipv4_handler(const u_char* packet)
 	version = IP_V(ip);          /* get ip version    */
 
 	if (version == 4){
-		u_int32_t addr_idx = (hash(ADDR_TO_UINT(ip->ip_src)) * hash_key) % hash_slots;
+		u_int32_t addr_idx = ipv4_hash(ip->ip_src, hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
 		if (c.ip.ver != 4 || memcmp(&c.ip.v4,&ip->ip_src, sizeof(ipv4)) != 0){
 			//Not what we are after, try dst
-			addr_idx = (hash(ADDR_TO_UINT(ip->ip_dst)) * hash_key) % hash_slots;
+			addr_idx = ipv4_hash(ip->ip_dst, hash_key) % hash_slots;
 
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
@@ -264,7 +264,26 @@ void ipv6_handler(const u_char* packet)
 	version = ip->version;          /* get ip version    */
 
 	if (version == 6){
-		
+		u_int32_t addr_idx = ipv6_hash(ip->src, hash_key) % hash_slots;
+		ipstat_entry& c = hash_buckets[addr_idx];
+
+		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->src, sizeof(ipv6)) != 0){
+			//Not what we are after, try dst
+			addr_idx = ipv6_hash(ip->dst, hash_key) % hash_slots;
+
+			ipstat_entry& c2 = hash_buckets[addr_idx];
+
+			//Check non-hashed ip and empty slot
+			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->dst, sizeof(ipv6)) != 0){
+				return;
+			}
+
+			increment_direction(ip->next_header, c2.in, len);
+		}
+		else
+		{
+			increment_direction(ip->next_header, c.out, len);
+		}
 	}
 }
 
@@ -321,9 +340,9 @@ void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 
 		//Attempt to find a solution
 		loaded = true;
-		for (int i = num_counters; i != 0; i--) {
+		for (int i = 0; i < num_counters; i++) {
 			struct ip_address c = counters[i];
-			unsigned int addr_idx = ip_hash(c, hash_key) * hash_key % hash_slots;
+			unsigned int addr_idx = ip_hash(c, hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip.ver != 0){
 				loaded = false;
 				break;
@@ -352,13 +371,15 @@ bool load_devs(const char* name){
 			//Count number of addresses (IPv4 & IPv6)
 			num_counters = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
-				if (a->addr->sa_family == AF_INET || a->addr->sa_family == AF_INET6){
+				if (a->addr->sa_family == AF_INET){
 					num_counters++;
+					hash_slots += 7;
+				}
+				else if (a->addr->sa_family == AF_INET6){
+					num_counters++;
+					hash_slots += 13;
 				}
 			}
-
-			//Size of hash table
-			hash_slots = num_counters * 12;
 			
 			//IP Address array
 			counters = (struct ip_address*)malloc(sizeof(struct ip_address)* num_counters);
