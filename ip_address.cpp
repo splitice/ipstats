@@ -19,7 +19,9 @@ void ip_to_string(const struct ip_address addr, char* output, int length){
 		sprintf_s(output, length, "%d.%d.%d.%d", addr.v4.byte1, addr.v4.byte2, addr.v4.byte3, addr.v4.byte4);
 	}
 	else if (addr.ver == 6){
-		sprintf_s(output, length, "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x", addr.v6.byte1, addr.v6.byte2, addr.v6.byte3, addr.v6.byte4, addr.v6.byte5, addr.v6.byte6, addr.v6.byte7, addr.v6.byte8);
+		sprintf_s(output, length, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+			addr.v6.byte1, addr.v6.byte2, addr.v6.byte3, addr.v6.byte4, addr.v6.byte5, addr.v6.byte6, addr.v6.byte7, addr.v6.byte8,
+			addr.v6.byte9, addr.v6.byte10, addr.v6.byte11, addr.v6.byte12, addr.v6.byte13, addr.v6.byte14, addr.v6.byte15, addr.v6.byte16);
 	}
 	else{
 		sprintf_s(output, length, "Unknown IP Version");

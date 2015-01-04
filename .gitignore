@@ -204,3 +204,4 @@ FakesAssemblies/
 *.exe
 *.out
 *.app
+*.dat
