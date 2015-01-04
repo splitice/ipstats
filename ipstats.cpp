@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -32,6 +34,7 @@
 #include <sys/time.h>
 #include <stddef.h>
 #include <assert.h>
+#include "ip_address.h"
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
@@ -52,13 +55,13 @@ typedef struct ipstat_directional_counters_s {
 
 /* A statistical entry */
 typedef struct ipstat_entry_s {
-	u_int32_t ip;
+	struct ip_address ip;
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
 } ipstat_entry;
 
 //Structure of an IP packet
-struct nread_ip {
+struct nread_ipv4 {
 	u_int8_t        ip_vhl;          /* header length, version    */
 #define IP_V(ip)    (((ip)->ip_vhl & 0xf0) >> 4)
 #define IP_HL(ip)   ((ip)->ip_vhl & 0x0f)
@@ -72,17 +75,32 @@ struct nread_ip {
 	u_int8_t        ip_ttl;          /* time to live              */
 	u_int8_t        ip_p;            /* protocol                  */
 	u_int16_t       ip_sum;          /* checksum                  */
-	struct  in_addr ip_src, ip_dst;  /* source and dest address   */
+	struct  ipv4 ip_src, ip_dst;  /* source and dest address   */
+};
+
+struct ipv6_header
+{
+	unsigned int
+		version : 4,
+		traffic_class : 8,
+		flow_label : 20;
+	uint16_t length;
+	uint8_t  next_header;
+	uint8_t  hop_limit;
+	struct ipv6 src;
+	struct ipv6 dst;
 };
 
 //Packet helpers
 #define ADDR_TO_UINT(x) *(u_int32_t*)&(x)
-uint16_t hostorder_ip;//constant in host order
+#define ADDR6_TO_UINT(x) *(u_int32_t*)&(x)//todo
+uint16_t hostorder_ipv4;
+uint16_t hostorder_ipv6;
 
 //Hash lookup
 #define HASH_KEY_INIT 1
-unsigned int hash_key = HASH_KEY_INIT;
-unsigned int hash_slots;
+uint32_t hash_key = HASH_KEY_INIT;
+uint32_t hash_slots;
 ipstat_entry* hash_buckets;
 
 //Packet counting
@@ -100,11 +118,26 @@ unsigned int next_time = 0;
 #endif
 
 /* Hash function for integer distribution */
-unsigned int hash(unsigned int x) {
+uint32_t hash(uint32_t x) {
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x);
 	return x;
+}
+
+uint32_t ip_hash(struct ip_address& ip, uint32_t ipv6_key){
+	if (ip.ver == 4){
+		return hash(*(uint32_t*)&ip.v4);
+	}
+	else if (ip.ver == 6){
+		uint32_t a = hash(*(uint32_t*)&ip.v6);
+		uint32_t b = hash(*(uint32_t*)(&ip.v6 + 4)) * ipv6_key;
+		uint32_t c = hash(*(uint32_t*)(&ip.v6 + 8)) + ipv6_key;
+		uint32_t d = hash(*(uint32_t*)(&ip.v6 + 12)) * ipv6_key;
+
+		return a ^ b ^ c ^ d;
+	}
+	return 0;
 }
 
 
@@ -132,17 +165,17 @@ void output_stats(){
 		ipstat_entry& c = hash_buckets[i];
 		
 		//empty bucket
-		if (c.ip == 0)
+		if (c.ip.ver == 0)
 			continue;
 
-		u_int32_t ip = c.ip;
+		const char* ip = ip_to_string(c.ip);
 
 		//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
-		printf("IN %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF, 
+		printf("IN %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
 			c.in.tcp.packets, c.in.tcp.bytes, c.in.udp.packets, c.in.udp.bytes, c.in.gre.packets, c.in.gre.bytes,
 			c.in.ipip.packets, c.in.ipip.bytes, c.in.icmp.packets, c.in.icmp.bytes, c.in.ipsec.packets, c.in.ipsec.bytes,
 			c.in.other.packets, c.in.other.bytes);
-		printf("OUT %d.%d.%d.%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24) & 0xFF,
+		printf("OUT %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
 			c.out.tcp.packets, c.out.tcp.bytes, c.out.udp.packets, c.out.udp.bytes, c.out.gre.packets, c.out.gre.bytes,
 			c.out.ipip.packets, c.out.ipip.bytes, c.out.icmp.packets, c.out.icmp.bytes, c.out.ipsec.packets, c.out.ipsec.bytes,
 			c.out.other.packets, c.out.other.bytes);
@@ -184,13 +217,13 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter
 }
 
 /* Handle an IP packet */
-void ip_handler(const u_char* packet)
+void ipv4_handler(const u_char* packet)
 {
-	const struct nread_ip* ip;   /* packet structure         */
+	const struct nread_ipv4* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
 	u_int16_t len;               /* length holder            */
 
-	ip = (struct nread_ip*)(packet + sizeof(struct ether_header));
+	ip = (struct nread_ipv4*)(packet + sizeof(struct ether_header));
 
 	len = ntohs(ip->ip_len); /* get packet length */
 	version = IP_V(ip);          /* get ip version    */
@@ -199,13 +232,14 @@ void ip_handler(const u_char* packet)
 		u_int32_t addr_idx = (hash(ADDR_TO_UINT(ip->ip_src)) * hash_key) % hash_slots;
 		ipstat_entry& c = hash_buckets[addr_idx];
 
-		if (c.ip == 0 || c.ip != ADDR_TO_UINT(ip->ip_src)){
+		if (c.ip.ver != 4 || memcmp(&c.ip.v4,&ip->ip_src, sizeof(ipv4)) != 0){
 			//Not what we are after, try dst
 			addr_idx = (hash(ADDR_TO_UINT(ip->ip_dst)) * hash_key) % hash_slots;
+
 			ipstat_entry& c2 = hash_buckets[addr_idx];
 			
 			//Check non-hashed ip and empty slot
-			if (c2.ip != ADDR_TO_UINT(ip->ip_dst) || c2.ip == 0){
+			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->ip_dst, sizeof(ipv4)) != 0){
 				return;
 			}
 
@@ -218,17 +252,36 @@ void ip_handler(const u_char* packet)
 	}
 }
 
+void ipv6_handler(const u_char* packet)
+{
+	const struct ipv6_header* ip;   /* packet structure         */
+	u_int version;               /*  version                 */
+	u_int16_t len;               /* length holder            */
+
+	ip = (struct ipv6_header*)(packet + sizeof(struct ether_header));
+
+	len = ntohs(ip->length); /* get packet length */
+	version = ip->version;          /* get ip version    */
+
+	if (version == 6){
+		
+	}
+}
+
 /* Handle an ethernet packet */
 void ethernet_handler(const u_char* packet)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 
-	if (eptr->ether_type == hostorder_ip) {
-		ip_handler(packet);
+	if (eptr->ether_type == hostorder_ipv4) {
+		ipv4_handler(packet);
 		packet_counter += PACKET_SAMPLING_RATE;
 		if (packet_counter >= packet_output_count){
 			output_stats();
 		}
+	}
+	else if (eptr->ether_type == hostorder_ipv6){
+
 	}
 	//else: dont care
 }
@@ -239,7 +292,7 @@ void pcap_ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, con
 	ethernet_handler(packet);
 }
 /* Initialize hash buckets */
-void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
+void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 {
 	bool loaded = false;
 
@@ -263,15 +316,15 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 
 		//Zero buckets
 		for (int i = 0; i < hash_slots; i++){
-			hash_buckets[i].ip = 0;
+			hash_buckets[i].ip.ver = 0;
 		}
 
 		//Attempt to find a solution
 		loaded = true;
 		for (int i = num_counters; i != 0; i--) {
-			unsigned int c = counters[i];
-			unsigned int addr_idx = hash(c) * hash_key % hash_slots;
-			if (hash_buckets[addr_idx].ip != 0){
+			struct ip_address c = counters[i];
+			unsigned int addr_idx = ip_hash(c, hash_key) * hash_key % hash_slots;
+			if (hash_buckets[addr_idx].ip.ver != 0){
 				loaded = false;
 				break;
 			}
@@ -283,7 +336,7 @@ void load_hash_buckets(u_int16_t num_counters, unsigned int* counters)
 /* Find our device, load addresses */
 bool load_devs(const char* name){
 	u_int16_t num_counters;
-	unsigned int* counters;
+	struct ip_address* counters;
 	bool found = false;
 	char errbuf[PCAP_ERRBUF_SIZE];
 
@@ -296,20 +349,26 @@ bool load_devs(const char* name){
 
 	for (pcap_if_t *d = alldevs; d != NULL; d = d->next) {
 		if (strcmp(d->name, name) == 0){
+			//Count number of addresses (IPv4 & IPv6)
 			num_counters = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
-				if (a->addr->sa_family == AF_INET){
+				if (a->addr->sa_family == AF_INET || a->addr->sa_family == AF_INET6){
 					num_counters++;
 				}
 			}
+
+			//Size of hash table
 			hash_slots = num_counters * 12;
-			counters = (unsigned int*)malloc(sizeof(unsigned int)* num_counters);
-			int i = 0;
+			
+			//IP Address array
+			counters = (struct ip_address*)malloc(sizeof(struct ip_address)* num_counters);
+
+			//Store all IP addresses
+			int i = 0, f = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
-				if (a->addr->sa_family == AF_INET){
-					unsigned int addr = ADDR_TO_UINT(((struct sockaddr_in*)a->addr)->sin_addr);
+				if (a->addr->sa_family == AF_INET || a->addr->sa_family == AF_INET6){
 					assert(i <= num_counters);
-					counters[i] = addr;
+					sockaddr_to_ip(a->addr, &counters[i]);
 					i++;
 				}
 			}
@@ -418,7 +477,8 @@ int main(int argc, char **argv)
 	if (argc != 2){ printf("Usage: %s device\n", argv[0]); return 1; }
 
 	//ethernet type
-	hostorder_ip = ntohs(ETHERTYPE_IP);
+	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
+	hostorder_ipv4 = ntohs(ETHERTYPE_IPV6);
 
 	/* grab a device to peak into... */
 	dev = argv[1];
