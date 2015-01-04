@@ -294,13 +294,14 @@ void ethernet_handler(const u_char* packet)
 
 	if (eptr->ether_type == hostorder_ipv4) {
 		ipv4_handler(packet);
-		packet_counter += PACKET_SAMPLING_RATE;
-		if (packet_counter >= packet_output_count){
-			output_stats();
-		}
 	}
 	else if (eptr->ether_type == hostorder_ipv6){
+		ipv6_handler(packet);
+	}
 
+	packet_counter += PACKET_SAMPLING_RATE;
+	if (packet_counter >= packet_output_count){
+		output_stats();
 	}
 	//else: dont care
 }
