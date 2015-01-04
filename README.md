@@ -1,7 +1,7 @@
 ipstats
 =======
 
-High Performance per IP address (and protocol) bandwidth statistics.
+High Performance per IP address (and protocol) bandwidth statistics supporting IPv4 & IPv6 addressing.
 
 # Example Output
 ```
