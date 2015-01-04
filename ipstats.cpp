@@ -118,7 +118,8 @@ unsigned int next_time = 0;
 
 /* Hash function for integer distribution */
 uint32_t ipv4_hash(ipv4 ip, uint32_t hash_key) {
-	uint32_t x = ((x >> 16) ^ *(uint32_t*)&ip) * 0x45d9f3b;
+	uint32_t x = *(uint32_t*)&ip;
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x) * 0x45d9f3b;
 	x = ((x >> 16) ^ x);
 	return x * hash_key;
@@ -343,7 +344,7 @@ void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 		loaded = true;
 		for (int i = 0; i < num_counters; i++) {
 			struct ip_address c = counters[i];
-			unsigned int addr_idx = ip_hash(c, hash_key) % hash_slots;
+			uint32_t addr_idx = ip_hash(c, hash_key) % hash_slots;
 			if (hash_buckets[addr_idx].ip.ver != 0){
 				loaded = false;
 				break;
@@ -435,7 +436,7 @@ void run_pfring(const char* dev)
 		return;
 	}
 
-	rc = pfring_set_poll_watermark(pd, 2048);
+	rc = pfring_set_poll_watermark(pd, 1024);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting the watermark: %s rc:%d\n", strerror(errno), rc);
 		return;
@@ -500,7 +501,7 @@ int main(int argc, char **argv)
 
 	//ethernet type
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
-	hostorder_ipv4 = ntohs(ETHERTYPE_IPV6);
+	hostorder_ipv6 = ntohs(ETHERTYPE_IPV6);
 
 	/* grab a device to peak into... */
 	dev = argv[1];
