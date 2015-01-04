@@ -8,7 +8,7 @@
 #endif
 #include "ip_address.h"
 
-static char ip_address[24];
+static char ip_address[46];
 const char* ip_to_string(const struct ip_address addr){
 	ip_to_string(addr, ip_address, sizeof(ip_address));
 	return ip_address;
