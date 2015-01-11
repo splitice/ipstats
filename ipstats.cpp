@@ -171,20 +171,20 @@ void output_stats(){
 
 		//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
 		printf("IN %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
-			c.in.tcp.packets, c.in.tcp.bytes, c.in.udp.packets, c.in.udp.bytes, c.in.gre.packets, c.in.gre.bytes,
-			c.in.ipip.packets, c.in.ipip.bytes, c.in.icmp.packets, c.in.icmp.bytes, c.in.ipsec.packets, c.in.ipsec.bytes,
-			c.in.other.packets, c.in.other.bytes);
+			c.in.tcp.packets * PACKET_INCREMENT, c.in.tcp.bytes * PACKET_INCREMENT, c.in.udp.packets * PACKET_INCREMENT, c.in.udp.bytes * PACKET_INCREMENT, c.in.gre.packets * PACKET_INCREMENT, c.in.gre.bytes * PACKET_INCREMENT,
+			c.in.ipip.packets * PACKET_INCREMENT, c.in.ipip.bytes * PACKET_INCREMENT, c.in.icmp.packets * PACKET_INCREMENT, c.in.icmp.bytes * PACKET_INCREMENT, c.in.ipsec.packets * PACKET_INCREMENT, c.in.ipsec.bytes * PACKET_INCREMENT,
+			c.in.other.packets * PACKET_INCREMENT, c.in.other.bytes * PACKET_INCREMENT);
 		printf("OUT %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
-			c.out.tcp.packets, c.out.tcp.bytes, c.out.udp.packets, c.out.udp.bytes, c.out.gre.packets, c.out.gre.bytes,
-			c.out.ipip.packets, c.out.ipip.bytes, c.out.icmp.packets, c.out.icmp.bytes, c.out.ipsec.packets, c.out.ipsec.bytes,
-			c.out.other.packets, c.out.other.bytes);
+			c.out.tcp.packets * PACKET_INCREMENT, c.out.tcp.bytes * PACKET_INCREMENT, c.out.udp.packets * PACKET_INCREMENT, c.out.udp.bytes * PACKET_INCREMENT, c.out.gre.packets * PACKET_INCREMENT, c.out.gre.bytes * PACKET_INCREMENT,
+			c.out.ipip.packets * PACKET_INCREMENT, c.out.ipip.bytes * PACKET_INCREMENT, c.out.icmp.packets * PACKET_INCREMENT, c.out.icmp.bytes * PACKET_INCREMENT, c.out.ipsec.packets * PACKET_INCREMENT, c.out.ipsec.bytes * PACKET_INCREMENT,
+			c.out.other.packets * PACKET_INCREMENT, c.out.other.bytes * PACKET_INCREMENT);
 	}
 }
 
 /* Increment a counter */
 inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
-	counter.packets += PACKET_INCREMENT;
-	counter.bytes += (length * PACKET_INCREMENT);
+	counter.packets ++;
+	counter.bytes += length;
 }
 
 /* Increment a counter for a protocol, in a direction */
@@ -298,7 +298,7 @@ void ethernet_handler(const u_char* packet)
 		ipv6_handler(packet);
 	}
 
-	packet_counter += PACKET_SAMPLING_RATE;
+	packet_counter++;
 	if (packet_counter >= packet_output_count){
 		output_stats();
 	}
