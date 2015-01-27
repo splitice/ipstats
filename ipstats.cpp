@@ -39,7 +39,7 @@
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
-	u_int64_t bytes;
+	u_int32_t bytes;
 	u_int32_t packets;
 } byte_packet_counter;
 
@@ -170,11 +170,11 @@ void output_stats(){
 		const char* ip = ip_to_string(c.ip);
 
 		//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
-		printf("IN %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
+		printf("IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", ip,
 			c.in.tcp.packets, c.in.tcp.bytes, c.in.udp.packets, c.in.udp.bytes, c.in.gre.packets, c.in.gre.bytes,
 			c.in.ipip.packets, c.in.ipip.bytes, c.in.icmp.packets, c.in.icmp.bytes, c.in.ipsec.packets, c.in.ipsec.bytes,
 			c.in.other.packets, c.in.other.bytes);
-		printf("OUT %s %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 " %" PRIu32 " %" PRIu64 "\n", ip,
+		printf("OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", ip,
 			c.out.tcp.packets, c.out.tcp.bytes, c.out.udp.packets, c.out.udp.bytes, c.out.gre.packets, c.out.gre.bytes,
 			c.out.ipip.packets, c.out.ipip.bytes, c.out.icmp.packets, c.out.icmp.bytes, c.out.ipsec.packets, c.out.ipsec.bytes,
 			c.out.other.packets, c.out.other.bytes);

@@ -10,7 +10,7 @@ IN 1.2.3.4 100 5552 0 0 0 0 0 0 0 0 0 0
 OUT 1.2.3.4 0 0 0 0 0 0 0 0 0 0 0 0
 ```
 
-IP ```1.2.3.4``` has sent no traffic, however it has received 100 TCP packets, totalling 5552 bytes. Counters are implemented using a 32 bit unsigned integer for packets, and a 64bit unsigned integer for bytes.
+IP ```1.2.3.4``` has sent no traffic, however it has received 100 TCP packets, totalling 5552 bytes. Counters are implemented using a 32 bit unsigned integer for packets and bytes bytes.
 
 # Usage
 ```ipstats [device]```
