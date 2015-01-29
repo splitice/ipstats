@@ -104,7 +104,7 @@ ipstat_entry* hash_buckets;
 //Packet counting
 u_int16_t packet_counter = 0; 
 u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
-unsigned int next_time = 0;
+time_t next_time = 0;
 
 #define TIME_INTERVAL 30
 #define PACKET_SAMPLING_RATE 5
@@ -118,7 +118,7 @@ unsigned int next_time = 0;
 /* Hash function for integer distribution */
 uint32_t ipv4_hash(ipv4_address ip, uint32_t hash_key) {
 	uint32_t x = *(uint32_t*)&ip;
-	if (hash_key == 0){
+	if (hash_key != 0){
 		x = ((x >> 16) ^ x) * 0x45d9f3b;
 		x = ((x >> 16) ^ x) * 0x45d9f3b;
 		x = ((x >> 16) ^ x);
@@ -191,29 +191,29 @@ inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
 }
 
 /* Increment a counter for a protocol, in a direction */
-void increment_direction(u_int8_t protocol, ipstat_directional_counters& counter, u_int16_t length){
+void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
 	switch (protocol){
 	case IPPROTO_TCP:
-		increment_counter(counter.tcp, length);
+		increment_counter(counter->tcp, length);
 		break;
 	case IPPROTO_UDP:
-		increment_counter(counter.udp, length);
+		increment_counter(counter->udp, length);
 		break;
 	case IPPROTO_GRE:
-		increment_counter(counter.gre, length);
+		increment_counter(counter->gre, length);
 		break;
 	case IPPROTO_IPIP:
-		increment_counter(counter.ipip, length);
+		increment_counter(counter->ipip, length);
 		break;
 	case IPPROTO_ICMP:
-		increment_counter(counter.icmp, length);
+		increment_counter(counter->icmp, length);
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
-		increment_counter(counter.ipsec, length);
+		increment_counter(counter->ipsec, length);
 		break;
 	default:
-		increment_counter(counter.other, length);
+		increment_counter(counter->other, length);
 		break;
 	}
 }
@@ -224,34 +224,41 @@ void ipv4_handler(const u_char* packet)
 	const struct nread_ipv4* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
 	u_int16_t len;               /* length holder            */
+	u_int32_t addr_idx;
+	ipstat_entry* c;
+	ipstat_directional_counters* counter;
 
+	//IP Header
 	ip = (struct nread_ipv4*)(packet + sizeof(struct ether_header));
-
 	len = ntohs(ip->ip_len); /* get packet length */
 	version = IP_V(ip);          /* get ip version    */
 
-	if (version == 4){
-		u_int32_t addr_idx = ipv4_hash(ip->ip_src, hash_key) % hash_slots;
-		ipstat_entry& c = hash_buckets[addr_idx];
-
-		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->ip_src, sizeof(ipv4_address)) != 0){
-			//Not what we are after, try dst
-			addr_idx = ipv4_hash(ip->ip_dst, hash_key) % hash_slots;
-
-			ipstat_entry& c2 = hash_buckets[addr_idx];
-			
-			//Check non-hashed ip and empty slot
-			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->ip_dst, sizeof(ipv4_address)) != 0){
-				return;
-			}
-
-			increment_direction(ip->ip_p, c2.in, len);
-		}
-		else
-		{
-			increment_direction(ip->ip_p, c.out, len);
-		}
+	if (version != 4){
+		return;
 	}
+
+	//Get the src bucket
+	addr_idx = ipv4_hash(ip->ip_src, hash_key) % hash_slots;
+	c = &hash_buckets[addr_idx];
+
+	if (c->ip.ver != 4 || (*(uint32_t*)&c->ip.v4) != (*(uint32_t*)&ip->ip_src)){
+		//Get the dst bucket
+		addr_idx = ipv4_hash(ip->ip_dst, hash_key) % hash_slots;
+		c = &hash_buckets[addr_idx];
+			
+		//Check non-hashed ip and empty slot
+		if (c->ip.ver == 0 || (*(uint32_t*)&c->ip.v4) != (*(uint32_t*)&ip->ip_dst)){
+			return;
+		}
+
+		counter = &c->in;
+	}
+	else
+	{
+		counter = &c->out;
+	}
+
+	increment_direction(ip->ip_p, counter, len);
 }
 
 void ipv6_handler(const u_char* packet)
@@ -259,34 +266,41 @@ void ipv6_handler(const u_char* packet)
 	const struct ipv6_header* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
 	u_int16_t len;               /* length holder            */
+	ipstat_directional_counters* counter;
+	u_int32_t addr_idx;
+	ipstat_entry* c;
 
+	//IP Header
 	ip = (struct ipv6_header*)(packet + sizeof(struct ether_header));
-
 	len = ntohs(ip->length); /* get packet length */
 	version = IP6_V(ip);          /* get ip version    */
 
-	if (version == 6){
-		u_int32_t addr_idx = ipv6_hash(ip->src, hash_key) % hash_slots;
-		ipstat_entry& c = hash_buckets[addr_idx];
-
-		if (c.ip.ver != 4 || memcmp(&c.ip.v4, &ip->src, sizeof(ipv6_address)) != 0){
-			//Not what we are after, try dst
-			addr_idx = ipv6_hash(ip->dst, hash_key) % hash_slots;
-
-			ipstat_entry& c2 = hash_buckets[addr_idx];
-
-			//Check non-hashed ip and empty slot
-			if (c2.ip.ver == 0 || memcmp(&c2.ip.v4, &ip->dst, sizeof(ipv6_address)) != 0){
-				return;
-			}
-
-			increment_direction(ip->next_header, c2.in, len);
-		}
-		else
-		{
-			increment_direction(ip->next_header, c.out, len);
-		}
+	if (version != 6){
+		return;
 	}
+
+	//Get the src bucket
+	addr_idx = ipv6_hash(ip->src, hash_key) % hash_slots;
+	c = &hash_buckets[addr_idx];
+
+	if (c->ip.ver != 6 || memcmp(&c->ip.v6, &ip->src, sizeof(ipv6_address)) != 0){
+		//Get the dst bucket
+		addr_idx = ipv6_hash(ip->dst, hash_key) % hash_slots;
+		c = &hash_buckets[addr_idx];
+
+		//Check non-hashed ip and empty slot
+		if (c->ip.ver == 0 || memcmp(&c->ip.v6, &ip->dst, sizeof(ipv6_address)) != 0){
+			return;
+		}
+
+		counter = &c->in;
+	}
+	else
+	{
+		counter = &c->out;
+	}
+
+	increment_direction(ip->next_header, counter, len);
 }
 
 /* Handle an ethernet packet */
