@@ -118,11 +118,13 @@ time_t next_time = 0;
 /* Hash function for integer distribution */
 uint32_t ipv4_hash(ipv4_address ip, uint32_t hash_key) {
 	uint32_t x = *(uint32_t*)&ip;
-	if (hash_key != 0){
-		x = ((x >> 16) ^ x) * 0x45d9f3b;
-		x = ((x >> 16) ^ x) * 0x45d9f3b;
-		x = ((x >> 16) ^ x);
+	if (hash_key == 0){
+		return x;
 	}
+
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = ((x >> 16) ^ x) * 0x45d9f3b;
+	x = ((x >> 16) ^ x);
 	return x * hash_key;
 }
 
