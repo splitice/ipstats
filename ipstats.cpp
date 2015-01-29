@@ -189,37 +189,41 @@ void output_stats(){
 }
 
 /* Increment a counter */
-inline void increment_counter(byte_packet_counter& counter, u_int16_t length){
-	counter.packets += PACKET_INCREMENT;
-	counter.bytes += length * PACKET_INCREMENT;
+inline void increment_counter(byte_packet_counter* counter, u_int16_t length){
+	counter->packets += PACKET_INCREMENT;
+	counter->bytes += length * PACKET_INCREMENT;
 }
 
 /* Increment a counter for a protocol, in a direction */
 void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
+	byte_packet_counter* bp;
+
 	switch (protocol){
 	case IPPROTO_TCP:
-		increment_counter(counter->tcp, length);
+		bp = &counter->tcp;
 		break;
 	case IPPROTO_UDP:
-		increment_counter(counter->udp, length);
+		bp = &counter->udp;
 		break;
 	case IPPROTO_GRE:
-		increment_counter(counter->gre, length);
+		bp = &counter->gre;
 		break;
 	case IPPROTO_IPIP:
-		increment_counter(counter->ipip, length);
+		bp = &counter->ipip;
 		break;
 	case IPPROTO_ICMP:
-		increment_counter(counter->icmp, length);
+		bp = &counter->icmp;
 		break;
 	case IPPROTO_ESP:
 	case IPPROTO_AH:
-		increment_counter(counter->ipsec, length);
+		bp = &counter->ipsec;
 		break;
 	default:
-		increment_counter(counter->other, length);
+		bp = &counter->other;
 		break;
 	}
+
+	increment_counter(bp, length);
 }
 
 /* Handle an IPv4 packet */
@@ -481,7 +485,7 @@ void run_pfring(const char* dev)
 		return;
 	}
 
-	pfring_set_poll_duration(pd, 1000);
+	pfring_set_poll_duration(pd, 200);
 
 #ifdef PACKET_SAMPLING_RATE
 	rc = pfring_set_sampling_rate(pd, PACKET_SAMPLING_RATE);
