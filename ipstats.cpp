@@ -126,12 +126,14 @@ uint32_t ipv4_hash(ipv4_address ip, uint32_t hash_key) {
 	return x * hash_key;
 }
 
+/* Hash an IPv6 address */
 uint32_t ipv6_hash(const ipv6_address& ip, uint32_t hash_key){
 	uint32_t ret;
 	MurmurHash3_x86_32(&ip, sizeof(ipv6_address), hash_key, &ret);
 	return ret;
 }
 
+/* Hash an IP address */
 uint32_t ip_hash(const struct ip_address& ip, uint32_t hash_key){
 	if (ip.ver == 4){
 		return ipv4_hash(ip.v4, hash_key);
@@ -218,7 +220,7 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter
 	}
 }
 
-/* Handle an IP packet */
+/* Handle an IPv4 packet */
 void ipv4_handler(const u_char* packet)
 {
 	const struct nread_ipv4* ip;   /* packet structure         */
@@ -261,6 +263,7 @@ void ipv4_handler(const u_char* packet)
 	increment_direction(ip->ip_p, counter, len);
 }
 
+/* Handle an IPv6 Packet */
 void ipv6_handler(const u_char* packet)
 {
 	const struct ipv6_header* ip;   /* packet structure         */
@@ -314,12 +317,15 @@ void ethernet_handler(const u_char* packet)
 	else if (eptr->ether_type == hostorder_ipv6){
 		ipv6_handler(packet);
 	}
+	else{
+		//We have no interest in non IP packets
+		return;
+	}
 
 	packet_counter++;
 	if (packet_counter >= packet_output_count){
 		output_stats();
 	}
-	//else: dont care
 }
 
 /* Handle an ethernet packet (libpcap callback) */
@@ -327,6 +333,7 @@ void pcap_ethernet_handler(u_char* unused, const struct pcap_pkthdr* pkthdr, con
 {
 	ethernet_handler(packet);
 }
+
 /* Initialize hash buckets */
 void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 {
@@ -369,6 +376,7 @@ void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 	}
 }
 
+/* Calculate an approsimate probability of hash collision */
 double approx_birthday_paradox(uint16_t k, uint32_t N){
 	return exp(-0.5 * (double)k * ((double)k - 1.0) / (double)N);
 }
