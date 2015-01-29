@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <stddef.h>
 #include <assert.h>
+#include <math.h>
 #include "ip_address.h"
 #include "MurmurHash3.h"
 
@@ -95,7 +96,7 @@ uint16_t hostorder_ipv4;
 uint16_t hostorder_ipv6;
 
 //Hash lookup
-#define HASH_KEY_INIT 1
+#define HASH_KEY_INIT -1
 uint32_t hash_key = HASH_KEY_INIT;
 uint32_t hash_slots;
 ipstat_entry* hash_buckets;
@@ -117,9 +118,11 @@ unsigned int next_time = 0;
 /* Hash function for integer distribution */
 uint32_t ipv4_hash(ipv4_address ip, uint32_t hash_key) {
 	uint32_t x = *(uint32_t*)&ip;
-	x = ((x >> 16) ^ x) * 0x45d9f3b;
-	x = ((x >> 16) ^ x) * 0x45d9f3b;
-	x = ((x >> 16) ^ x);
+	if (hash_key == 0){
+		x = ((x >> 16) ^ x) * 0x45d9f3b;
+		x = ((x >> 16) ^ x) * 0x45d9f3b;
+		x = ((x >> 16) ^ x);
+	}
 	return x * hash_key;
 }
 
@@ -352,6 +355,10 @@ void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 	}
 }
 
+double approx_birthday_paradox(uint16_t k, uint32_t N){
+	return exp(-0.5 * (double)k * ((double)k - 1.0) / (double)N);
+}
+
 /* Find our device, load addresses */
 bool load_devs(const char* name){
 	u_int16_t num_counters;
@@ -378,6 +385,16 @@ bool load_devs(const char* name){
 				else if (a->addr->sa_family == AF_INET6){
 					num_counters++;
 					hash_slots += 13;
+				}
+			}
+
+			//Increase hash table with size
+			//TODO: Open Addressing or Buckets to scale to thousands
+			double probability_estimate = 1;
+			for (uint8_t i = 0; i < 6; i++){
+				probability_estimate = approx_birthday_paradox(num_counters, hash_slots);
+				if (probability_estimate > 0.9995){
+					hash_slots *= 2;
 				}
 			}
 			
