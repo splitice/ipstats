@@ -35,7 +35,7 @@ while read line; do
                 read line
                 s=$?
                 if [[ $s != 0 ]]; then
-                        run=1
+                        run=0
                 fi
         done | /usr/bin/zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -vv -i -
 done
