@@ -9,7 +9,7 @@ function get_data_line {
 
 while read line; do
         run=1
-        while [[ $run ]]; do
+        (while [[ $run ]]; do
                 if [[ "${line:0:1}" != "#" ]]; then
                         get_data_line "$line" "tcp_packets" 3
                         get_data_line "$line" "tcp_bytes" 4
@@ -37,5 +37,5 @@ while read line; do
                 if [[ $s != 0 ]]; then
                         run=0
                 fi
-        done | /usr/bin/zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -vv -i -
+        done) | /usr/bin/zabbix_sender -c /etc/zabbix/zabbix_agentd.conf -vv -i -
 done
