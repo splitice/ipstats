@@ -11,7 +11,7 @@ fi
 
 apt-get install build-essential libnuma-dev subversion linux-headers-$kernel --force-yes -y
 
-svn co https://svn.ntop.org/svn/ntop/trunk/PF_RING/ PF_RING
+git clone https://github.com/ntop/PF_RING
 
 cd PF_RING/kernel
 BUILD_KERNEL=$kernel make
