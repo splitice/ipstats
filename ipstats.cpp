@@ -462,7 +462,7 @@ void run_pfring(const char* dev)
 	pfring_pkthdr hdr;
 	int rc;
 
-	pfring* pd = pfring_open(dev, 200, flags);
+	pfring* pd = pfring_open(dev, sizeof(ether_header) + sizeof(ipv6_header), flags);
 	if (pd == NULL){
 		printf("#Error: A PF_RING error occured while opening: %s\n", strerror(errno));
 	}
