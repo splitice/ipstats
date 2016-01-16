@@ -167,6 +167,8 @@ void output_stats(){
 	if (written < 0){
 		exit(2);
 	}
+	
+	//Output for every IP (IN+OUT)
 	for (int i = 0; i < hash_slots; i++) {
 		ipstat_entry& c = hash_buckets[i];
 		
@@ -186,6 +188,9 @@ void output_stats(){
 			c.out.ipip.packets, c.out.ipip.bytes, c.out.icmp.packets, c.out.icmp.bytes, c.out.ipsec.packets, c.out.ipsec.bytes,
 			c.out.other.packets, c.out.other.bytes);
 	}
+	
+	//Flush the output buffer
+	fflush(stdout);
 }
 
 /* Increment a counter */
