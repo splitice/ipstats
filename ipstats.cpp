@@ -479,7 +479,7 @@ pfring* open_pfring(const char* dev){
 
 	pfring* pd = pfring_open(dev, sizeof(ether_header) + sizeof(ipv6_header), PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP);
 	if (pd == NULL){
-		printf("#Error: A PF_RING error occured while opening: %s\n", strerror(errno));
+		printf("#Error: A PF_RING error occured while opening %s: %s\n", dev, strerror(errno));
 		return NULL;
 	}
 
@@ -601,7 +601,7 @@ int main(int argc, char **argv)
 
 	/* read all devices */
 	std::set<char*, ConstCharStarComparator> devs;
-	for (int i = 0; i < argc - 1; i++)
+	for (int i = 1; i < argc - 1; i++)
 	{
 		devs.insert(argv[i]);
 	}
