@@ -32,8 +32,11 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/epoll.h>
 #include <stddef.h>
 #include <assert.h>
+#include <map>
+#include <set>
 #include <math.h>
 #include "ip_address.h"
 #include "MurmurHash3.h"
@@ -387,13 +390,22 @@ void load_hash_buckets(u_int16_t num_counters, struct ip_address* counters)
 	}
 }
 
+struct ConstCharStarComparator
+{
+	bool operator()(const char *s1, const char *s2) const
+	{
+		return strcmp(s1, s2) < 0;
+	}
+};
+
+
 /* Calculate an approsimate probability of hash collision */
 double approx_birthday_paradox(uint16_t k, uint32_t N){
 	return exp(-0.5 * (double)k * ((double)k - 1.0) / (double)N);
 }
 
 /* Find our device, load addresses */
-bool load_devs(const char* name){
+bool load_devs(std::set<char*, ConstCharStarComparator> names) {
 	u_int16_t num_counters;
 	struct ip_address* counters;
 	bool found = false;
@@ -407,33 +419,37 @@ bool load_devs(const char* name){
 	}
 
 	for (pcap_if_t *d = alldevs; d != NULL; d = d->next) {
-		if (strcmp(d->name, name) == 0){
+		if (names.find(d->name) != names.end()) {
 			//Count number of addresses (IPv4 & IPv6)
 			num_counters = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
-				if (a->addr->sa_family == AF_INET){
+				if (a->addr->sa_family == AF_INET) {
 					num_counters++;
 					hash_slots += 7;
 				}
-				else if (a->addr->sa_family == AF_INET6){
+				else if (a->addr->sa_family == AF_INET6) {
 					num_counters++;
 					hash_slots += 13;
 				}
 			}
+		}
+	}
 
-			//Increase hash table with size
-			//TODO: Open Addressing or Buckets to scale to thousands
-			double probability_estimate = 1;
-			for (uint8_t i = 0; i < 6; i++){
-				probability_estimate = approx_birthday_paradox(num_counters, hash_slots);
-				if (probability_estimate > 0.9995){
-					hash_slots *= 2;
-				}
-			}
+	//Increase hash table with size
+	//TODO: Open Addressing or Buckets to scale to thousands
+	double probability_estimate = 1;
+	for (uint8_t i = 0; i < 6; i++){
+		probability_estimate = approx_birthday_paradox(num_counters, hash_slots);
+		if (probability_estimate > 0.9995){
+			hash_slots *= 2;
+		}
+	}
 			
-			//IP Address array
-			counters = (struct ip_address*)malloc(sizeof(struct ip_address)* num_counters);
+	//IP Address array
+	counters = (struct ip_address*)malloc(sizeof(struct ip_address)* num_counters);
 
+	for (pcap_if_t *d = alldevs; d != NULL; d = d->next) {
+		if (names.find(d->name) != names.end()) {
 			//Store all IP addresses
 			int i = 0, f = 0;
 			for (pcap_addr_t *a = d->addresses; a != NULL; a = a->next) {
@@ -444,7 +460,6 @@ bool load_devs(const char* name){
 				}
 			}
 			found = true;
-			break;
 		}
 	}
 
@@ -459,58 +474,91 @@ bool load_devs(const char* name){
 }
 
 #ifdef USE_PF_RING
-/* Process packets using PF_RING */
-void run_pfring(const char* dev)
-{
-	u_int flags = PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP;
-	u_char* buffer;
-	pfring_pkthdr hdr;
+pfring* open_pfring(const char* dev){
 	int rc;
 
-	pfring* pd = pfring_open(dev, sizeof(ether_header) + sizeof(ipv6_header), flags);
+	pfring* pd = pfring_open(dev, sizeof(ether_header) + sizeof(ipv6_header), PF_RING_DO_NOT_PARSE | PF_RING_DO_NOT_TIMESTAMP);
 	if (pd == NULL){
 		printf("#Error: A PF_RING error occured while opening: %s\n", strerror(errno));
+		return NULL;
 	}
 
 	rc = pfring_set_direction(pd, rx_and_tx_direction);
-	if(rc < 0){
+	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting direction: %s rc:%d\n", strerror(errno), rc);
-		return;
+		return NULL;
 	}
 
 	rc = pfring_enable_ring(pd);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while enabling: %s rc:%d\n", strerror(errno), rc);
-		return;
+		return NULL;
 	}
 
 	rc = pfring_set_poll_watermark(pd, 1024);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting the watermark: %s rc:%d\n", strerror(errno), rc);
-		return;
+		return NULL;
 	}
-
-	pfring_set_poll_duration(pd, 200);
 
 #ifdef PACKET_SAMPLING_RATE
 	rc = pfring_set_sampling_rate(pd, PACKET_SAMPLING_RATE);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
-		return;
+		return NULL;
 	}
 #endif
 
+	return pd;
+}
+
+/* Process packets using PF_RING */
+void run_pfring(const char** dev, int ndev)
+{
+	u_char* buffer;
+	pfring_pkthdr hdr;
+	int epfd;
+	struct epoll_event event;
+	struct epoll_event events[16];
+	std::map<int, pfring*> fd_map;
+
+	epfd = epoll_create1(0);
+	if (epfd == -1)
+	{
+		perror("#Error: epoll_create");
+		return;
+	}
+
+	for (int i = 0; i < ndev; i++){
+		pfring* pd = open_pfring(dev[i]);
+		int sfd = pfring_get_selectable_fd(pd);
+
+		event.data.fd = sfd;
+		event.events = EPOLLIN;
+		epoll_ctl(epfd, EPOLL_CTL_ADD, sfd, &event);
+		fd_map[sfd] = pd;
+	}
+
 	while (true){
-		rc = pfring_recv(pd, &buffer, 0, &hdr, 1);
-		if (rc > 0){
-			ethernet_handler(buffer);
-		}else if (rc < 0){
-			printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
-			return;
+		int n = epoll_wait(epfd, events, 16, 500);
+		for (int i = 0; i < n; i++)
+		{
+			int rc = pfring_recv(fd_map[events[i].data.fd], &buffer, 0, &hdr, 1);
+			if (rc > 0){
+				ethernet_handler(buffer);
+			}
+			else if (rc < 0){
+				printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
+				return;
+			}
 		}
 	}
 
-	pfring_close(pd);
+	for (std::map<int, pfring*>::iterator it = fd_map.begin(); it != fd_map.end(); it++){
+		pfring_close(it->second);
+	}
+	
+	close(epfd);
 }
 #else
 /* Process packets using pcap */
@@ -545,15 +593,21 @@ int main(int argc, char **argv)
 {
 	char *dev;
 
-	if (argc != 2){ printf("Usage: %s device\n", argv[0]); return 1; }
+	if (argc != 2){ printf("Usage: %s [devices] ...\n", argv[0]); return 1; }
 
 	//ethernet type
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
 	hostorder_ipv6 = ntohs(ETHERTYPE_IPV6);
 
+	/* read all devices */
+	std::set<char*, ConstCharStarComparator> devs;
+	for (int i = 0; i < argc - 1; i++)
+	{
+		devs.insert(argv[i]);
+	}
+	
 	/* grab a device to peak into... */
-	dev = argv[1];
-	if (!load_devs(dev)){
+	if (!load_devs(devs)) {
 		printf("# Init failed, device not found.\n");
 		return 1;
 	}
@@ -562,9 +616,9 @@ int main(int argc, char **argv)
 	printf("# Init complete. Starting\n");
 
 #ifdef USE_PF_RING
-	run_pfring(dev);
+	run_pfring((const char**)(argv + 1), argc - 1);
 #else
-	run_pcap(dev);
+	run_pcap(argv[1]);
 #endif
 
 	return 0;
