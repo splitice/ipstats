@@ -593,7 +593,7 @@ int main(int argc, char **argv)
 {
 	char *dev;
 
-	if (argc != 2){ printf("Usage: %s [devices] ...\n", argv[0]); return 1; }
+	if (argc < 2){ printf("Usage: %s [devices] ...\n", argv[0]); return 1; }
 
 	//ethernet type
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
