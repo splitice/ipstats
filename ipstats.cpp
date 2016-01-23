@@ -521,6 +521,7 @@ void run_pfring(const char** dev, int ndev)
 	struct epoll_event event;
 	struct epoll_event events[16];
 	std::map<int, pfring*> fd_map;
+	bool running = true;
 
 	epfd = epoll_create1(0);
 	if (epfd == -1)
@@ -543,14 +544,13 @@ void run_pfring(const char** dev, int ndev)
 		fd_map[sfd] = pd;
 	}
 
-	while (true){
+	while (running){
 		int n = epoll_wait(epfd, events, 16, 500);
 		for (int i = 0; i < n; i++)
 		{
 			int rc = pfring_recv(fd_map[events[i].data.fd], &buffer, 0, &hdr, 0);
 			if (rc == 0)
 			{
-				
 				continue;
 			}
 			else if (rc > 0)
@@ -560,7 +560,8 @@ void run_pfring(const char** dev, int ndev)
 			else
 			{
 				printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
-				return;
+				running = false;
+				break;
 			}
 		}
 	}
