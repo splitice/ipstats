@@ -547,11 +547,18 @@ void run_pfring(const char** dev, int ndev)
 		int n = epoll_wait(epfd, events, 16, 500);
 		for (int i = 0; i < n; i++)
 		{
-			int rc = pfring_recv(fd_map[events[i].data.fd], &buffer, 0, &hdr, 1);
-			if (rc > 0){
+			int rc = pfring_recv(fd_map[events[i].data.fd], &buffer, 0, &hdr, 0);
+			if (rc == 0)
+			{
+				
+				continue;
+			}
+			else if (rc > 0)
+			{
 				ethernet_handler(buffer);
 			}
-			else if (rc < 0){
+			else
+			{
 				printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
 				return;
 			}
