@@ -15,7 +15,7 @@ IP ```1.2.3.4``` has sent no traffic, however it has received 100 TCP packets, t
 # Usage
 ```ipstats [device]```
 
-ipstats listens on a given device. ```all``` can be specified to listen to all interfaces.
+ipstats listens on a given device. ```all``` can be specified to listen to all interfaces. Multiple devices can be supplied if compile with PF_RING support.
 
 # Installation
 ipstats can be compiled using the included ```make.sh```. PF_RING support can be enabled by adding using ```make.sh pf_ring```. A helper script to compile and install pf_ring has been included (see contrib)

@@ -534,8 +534,12 @@ void run_pfring(const char** dev, int ndev)
 		int sfd = pfring_get_selectable_fd(pd);
 
 		event.data.fd = sfd;
-		event.events = EPOLLIN;
-		epoll_ctl(epfd, EPOLL_CTL_ADD, sfd, &event);
+		event.events = EPOLLOUT | EPOLLIN;
+		if (epoll_ctl(epfd, EPOLL_CTL_ADD, sfd, &event) == -1)
+		{
+			perror("#Error: epoll_ctl add failed");
+			return;
+		}
 		fd_map[sfd] = pd;
 	}
 
@@ -594,6 +598,14 @@ int main(int argc, char **argv)
 	char *dev;
 
 	if (argc < 2){ printf("Usage: %s [devices] ...\n", argv[0]); return 1; }
+	
+#ifndef USE_PF_RING
+	if (argc != 2)
+	{
+		printf("Compiled with PCAP backend, only supports one device. Patches welcome.\n", argv[0]); return 1;
+	}
+#endif
+
 
 	//ethernet type
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
@@ -601,7 +613,7 @@ int main(int argc, char **argv)
 
 	/* read all devices */
 	std::set<char*, ConstCharStarComparator> devs;
-	for (int i = 1; i < argc - 1; i++)
+	for (int i = 1; i < argc; i++)
 	{
 		devs.insert(argv[i]);
 	}
