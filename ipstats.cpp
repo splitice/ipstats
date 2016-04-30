@@ -126,10 +126,9 @@ time_t next_time = 0;
 #endif
 
 /* Hash an IPv6 address */
-uint32_t ipv6_hash(const ipv6_address& ip, uint32_t hash_key){
-	uint32_t ret;
-	MurmurHash3_x86_32(&ip, sizeof(ipv6_address), hash_key, &ret);
-	return ret;
+uint32_t ipv6_hash(const ipv6_address& ip){
+	uint32_t* thirtytwos = (uint32_t*)&ip;
+	return thirtytwos[0] ^ thirtytwos[1] ^ thirtytwos[2] ^ thirtytwos[3];
 }
 
 
@@ -291,11 +290,17 @@ void ipv4_handler(const u_char* packet, bool incomming)
 		}
 		c = (ipstat_entry*)malloc(sizeof(ipstat_entry));
 		memset(c, 0, sizeof(ipstat_entry));
-		memcpy(&c->ip, &addr, sizeof(addr));
+		c->ip.ver = 4;
+		memcpy(&c->ip.v4, &addr, sizeof(addr));
 		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
 	}
 	else
 	{
+		if (c->ip.ver != 4)
+		{
+			//IPv6 conflict, TODO: handle
+			return;
+		}
 	}
 	
 	counter = incomming ? &c->in : &c->out;
@@ -321,12 +326,37 @@ void ipv6_handler(const u_char* packet, bool incomming)
 	if (version != 6){
 		return;
 	}
+	
+	struct ipv6_address addr = incomming ? ip->dst : ip->src;
 
 	//Get the src bucket
-	//addr_idx = ipv6_hash(ip->src);
-	
+	addr_idx = ipv6_hash(addr);
+	c = pages[addr_idx >> 16][addr_idx & 0xFFFF];
 
-	//increment_direction(ip->next_header, counter, len);
+	if (c == NULL)
+	{
+		if (pages[addr_idx >> 16] == sentinel)
+		{
+			pages[addr_idx >> 16] = allocate_new_null_filled_page();
+		}
+		c = (ipstat_entry*)malloc(sizeof(ipstat_entry));
+		memset(c, 0, sizeof(ipstat_entry));
+		c->ip.ver = 6;
+		memcpy(&c->ip.v6, &addr, sizeof(addr));
+		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
+	}
+	else
+	{
+		if (c->ip.ver != 6 || memcmp(&c->ip.v6,&addr,sizeof(addr)) == 0)
+		{
+			//IPv6 conflict, TODO: handle
+			return;
+		}
+	}
+	
+	counter = incomming ? &c->in : &c->out;
+	
+	increment_direction(ip->next_header, counter, len);
 }
 
 /* Handle an ethernet packet */
