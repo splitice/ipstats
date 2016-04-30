@@ -61,6 +61,7 @@ typedef struct ipstat_directional_counters_s {
 
 /* A statistical entry */
 typedef struct ipstat_entry_s {
+	ipstat_entry_s* next;
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
 	struct ip_address ip;
@@ -115,12 +116,12 @@ ipstat_entry ** pages[PAGES];  // list of pages,
 
 //Packet counting
 u_int16_t packet_counter = 0; 
-u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
+u_int16_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
 
-#define TIME_INTERVAL 30
-#define PACKET_SAMPLING_RATE 5
+#define TIME_INTERVAL 15
+#define PACKET_SAMPLING_RATE 10
 
 #ifdef PACKET_SAMPLING_RATE
 #define PACKET_INCREMENT PACKET_SAMPLING_RATE
@@ -130,8 +131,8 @@ time_t prev_time = 0;
 
 /* Hash an IPv6 address */
 uint32_t ipv6_hash(const ipv6_address& ip){
-	uint32_t* thirtytwos = (uint32_t*)&ip;
-	return thirtytwos[0] ^ thirtytwos[1] ^ thirtytwos[2] ^ thirtytwos[3];
+	uint16_t* twos = (uint16_t*)&ip;
+	return twos[0] ^ twos[1] ^ twos[2] ^ twos[3] ^ ((twos[4] ^ twos[5] ^ twos[6] ^ twos[7]) >> 16);
 }
 
 /* Output stats */
@@ -166,63 +167,78 @@ void output_stats(){
 		bool clear = true;
 		for (int f = 0; f < PAGES; f++)
 		{
+			ipstat_entry* prev = NULL;
 			ipstat_entry* c = pages[i][f];
-			if (c == NULL) continue;
-			clear = false;
-			
-			const char* ip = ip_to_string(c->ip);
-			
-			if (c->isnew && prev_time != 0)
+			while (c != NULL)
 			{
-				printf("%u IN %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-					prev_time,
-					ip);
-				printf("%u OUT %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-					prev_time,
-					ip);
-				c->isnew = false;
-			}
+				clear = false;
+			
+				const char* ip = ip_to_string(c->ip);
+			
+				if (c->isnew && prev_time != 0)
+				{
+					printf("%u IN %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+						prev_time,
+						ip);
+					printf("%u OUT %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+						prev_time,
+						ip);
+					c->isnew = false;
+				}
 
-			//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
-			printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
-				tv.tv_sec,
-				ip,
-				c->in.tcp.packets/TIME_INTERVAL,
-				c->in.tcp.bytes/TIME_INTERVAL,
-				c->in.udp.packets/TIME_INTERVAL,
-				c->in.udp.bytes/TIME_INTERVAL,
-				c->in.gre.packets/TIME_INTERVAL,
-				c->in.gre.bytes/TIME_INTERVAL,
-				c->in.ipip.packets/TIME_INTERVAL,
-				c->in.ipip.bytes/TIME_INTERVAL,
-				c->in.icmp.packets/TIME_INTERVAL,
-				c->in.icmp.bytes/TIME_INTERVAL,
-				c->in.ipsec.packets/TIME_INTERVAL,
-				c->in.ipsec.bytes/TIME_INTERVAL,
-				c->in.other.packets/TIME_INTERVAL,
-				c->in.other.bytes/TIME_INTERVAL);
-			printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
-				tv.tv_sec,
-				ip,
-				c->out.tcp.packets/TIME_INTERVAL,
-				c->out.tcp.bytes/TIME_INTERVAL,
-				c->out.udp.packets/TIME_INTERVAL,
-				c->out.udp.bytes/TIME_INTERVAL,
-				c->out.gre.packets/TIME_INTERVAL,
-				c->out.gre.bytes/TIME_INTERVAL,
-				c->out.ipip.packets/TIME_INTERVAL,
-				c->out.ipip.bytes/TIME_INTERVAL,
-				c->out.icmp.packets/TIME_INTERVAL,
-				c->out.icmp.bytes/TIME_INTERVAL,
-				c->out.ipsec.packets/TIME_INTERVAL,
-				c->out.ipsec.bytes/TIME_INTERVAL,
-				c->out.other.packets/TIME_INTERVAL,
-				c->out.other.bytes/TIME_INTERVAL);
+							//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
+				printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+					tv.tv_sec,
+					ip,
+					c->in.tcp.packets/TIME_INTERVAL,
+					c->in.tcp.bytes/TIME_INTERVAL,
+					c->in.udp.packets/TIME_INTERVAL,
+					c->in.udp.bytes/TIME_INTERVAL,
+					c->in.gre.packets/TIME_INTERVAL,
+					c->in.gre.bytes/TIME_INTERVAL,
+					c->in.ipip.packets/TIME_INTERVAL,
+					c->in.ipip.bytes/TIME_INTERVAL,
+					c->in.icmp.packets/TIME_INTERVAL,
+					c->in.icmp.bytes/TIME_INTERVAL,
+					c->in.ipsec.packets/TIME_INTERVAL,
+					c->in.ipsec.bytes/TIME_INTERVAL,
+					c->in.other.packets/TIME_INTERVAL,
+					c->in.other.bytes/TIME_INTERVAL);
+				printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+					tv.tv_sec,
+					ip,
+					c->out.tcp.packets/TIME_INTERVAL,
+					c->out.tcp.bytes/TIME_INTERVAL,
+					c->out.udp.packets/TIME_INTERVAL,
+					c->out.udp.bytes/TIME_INTERVAL,
+					c->out.gre.packets/TIME_INTERVAL,
+					c->out.gre.bytes/TIME_INTERVAL,
+					c->out.ipip.packets/TIME_INTERVAL,
+					c->out.ipip.bytes/TIME_INTERVAL,
+					c->out.icmp.packets/TIME_INTERVAL,
+					c->out.icmp.bytes/TIME_INTERVAL,
+					c->out.ipsec.packets/TIME_INTERVAL,
+					c->out.ipsec.bytes/TIME_INTERVAL,
+					c->out.other.packets/TIME_INTERVAL,
+					c->out.other.bytes/TIME_INTERVAL);
 			
-			if (!c->used)
-			{
-				free(c);
-				pages[i][f] = NULL;
+				ipstat_entry* next = c->next;
+				if (!c->used)
+				{
+					if (prev == NULL)
+					{
+						pages[i][f] = c->next;
+						free(c);
+						c = NULL;
+					}
+					else
+					{
+						prev->next = c->next;
+						free(c);
+					}
+				}
+				prev = c;
+				c = next;
 			}
 		}
 		
@@ -292,6 +308,7 @@ void ipv4_handler(const u_char* packet, bool incomming)
 	u_int16_t len;               /* length holder            */
 	u_int32_t addr_idx;
 	ipstat_entry* c;
+	ipstat_entry* last = NULL;
 	ipstat_directional_counters* counter;
 
 	//IP Header
@@ -307,27 +324,31 @@ void ipv4_handler(const u_char* packet, bool incomming)
 
 	//Get the src bucket
 	addr_idx = IPV4_UINT32(addr);
-	c = pages[addr_idx >> 16][addr_idx & 0xFFFF];
+	c = pages[addr_idx & 0xFFFF][addr_idx >> 16];
 
+	while (c != NULL && c->ip.ver != 4)
+	{
+		last = c;
+		c = c->next;
+	}
 	if (c == NULL)
 	{
-		if (pages[addr_idx >> 16] == sentinel)
-		{
-			pages[addr_idx >> 16] = allocate_new_null_filled_page();
-		}
 		c = (ipstat_entry*)malloc(sizeof(ipstat_entry));
 		memset(c, 0, sizeof(ipstat_entry));
 		c->ip.ver = 4;
 		memcpy(&c->ip.v4, &addr, sizeof(addr));
 		c->isnew = true;
-		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
-	}
-	else
-	{
-		if (c->ip.ver != 4)
+		if (last == NULL)
 		{
-			//IPv6 conflict, TODO: handle
-			return;
+			if (pages[addr_idx & 0xFFFF] == sentinel)
+			{
+				pages[addr_idx & 0xFFFF] = allocate_new_null_filled_page();
+			}
+			pages[addr_idx & 0xFFFF][addr_idx >> 16] = c;
+		}
+		else
+		{
+			last->next = c;
 		}
 	}
 	
@@ -346,6 +367,7 @@ void ipv6_handler(const u_char* packet, bool incomming)
 	ipstat_directional_counters* counter;
 	u_int32_t addr_idx;
 	ipstat_entry* c;
+	ipstat_entry* last = NULL;
 
 	//IP Header
 	ip = (struct ipv6_header*)(packet + sizeof(struct ether_header));
@@ -360,28 +382,32 @@ void ipv6_handler(const u_char* packet, bool incomming)
 
 	//Get the src bucket
 	addr_idx = ipv6_hash(addr);
-	c = pages[addr_idx >> 16][addr_idx & 0xFFFF];
+	c = pages[addr_idx & 0xFFFF][addr_idx >> 16];
 
+	while (c != NULL && (c->ip.ver != 6 || memcmp(&c->ip.v6, &addr, sizeof(addr)) == 0))
+	{
+		last = c;
+		c = c->next;
+	}
 	if (c == NULL)
 	{
-		if (pages[addr_idx >> 16] == sentinel)
-		{
-			pages[addr_idx >> 16] = allocate_new_null_filled_page();
-		}
 		c = (ipstat_entry*)malloc(sizeof(ipstat_entry));
 		memset(c, 0, sizeof(ipstat_entry));
 		c->ip.ver = 6;
 		memcpy(&c->ip.v6, &addr, sizeof(addr));
 		c->isnew = true;
-		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
-	}
-	else
-	{
-		if (c->ip.ver != 6 || memcmp(&c->ip.v6,&addr,sizeof(addr)) == 0)
+		if (last == NULL)
 		{
-			//IPv6 conflict, TODO: handle
-			return;
+			if (pages[addr_idx & 0xFFFF] == sentinel)
+			{
+				pages[addr_idx & 0xFFFF] = allocate_new_null_filled_page();
+			}
+			pages[addr_idx & 0xFFFF][addr_idx >> 16] = c;
 		}
+		else
+		{
+			last->next = c;
+		}		
 	}
 	
 	counter = incomming ? &c->in : &c->out;
