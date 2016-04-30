@@ -64,6 +64,7 @@ typedef struct ipstat_entry_s {
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
 	struct ip_address ip;
+	bool used;
 } ipstat_entry;
 
 typedef struct eth_def_s
@@ -160,10 +161,12 @@ void output_stats(){
 		{
 			continue;
 		}
+		bool clear = true;
 		for (int f = 0; f < PAGES; f++)
 		{
 			ipstat_entry* c = pages[i][f];
 			if (c == NULL) continue;
+			clear = false;
 			
 			const char* ip = ip_to_string(c->ip);
 
@@ -201,11 +204,18 @@ void output_stats(){
 				c->out.other.packets,
 				c->out.other.bytes);
 			
-			free(c);
+			if (!c->used)
+			{
+				free(c);
+				pages[i][f] = NULL;
+			}
 		}
 		
-		free(pages[i]);
-		pages[i] = sentinel;
+		if (clear)
+		{
+			free(pages[i]);
+			pages[i] = sentinel;
+		}
 	}
 	
 	//Flush the output buffer
@@ -306,6 +316,7 @@ void ipv4_handler(const u_char* packet, bool incomming)
 	counter = incomming ? &c->in : &c->out;
 
 	increment_direction(ip->ip_p, counter, len);
+	c->used = true;
 }
 
 /* Handle an IPv6 Packet */
@@ -357,6 +368,7 @@ void ipv6_handler(const u_char* packet, bool incomming)
 	counter = incomming ? &c->in : &c->out;
 	
 	increment_direction(ip->next_header, counter, len);
+	c->used = true;
 }
 
 /* Handle an ethernet packet */
