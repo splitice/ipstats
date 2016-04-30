@@ -186,7 +186,7 @@ void output_stats(){
 					c->isnew = false;
 				}
 
-							//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
+				//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
 				printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
 					tv.tv_sec,
 					ip,
@@ -236,6 +236,11 @@ void output_stats(){
 						prev->next = c->next;
 						free(c);
 					}
+				}
+				else
+				{
+					memset(&c->out, 0, sizeof(c->out));
+					memset(&c->in, 0, sizeof(c->in));
 				}
 				prev = c;
 				c = next;
