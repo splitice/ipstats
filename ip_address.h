@@ -41,5 +41,6 @@ void ip_to_string(const struct ip_address addr, char* output, int length);
 bool string_to_ip(const char* addr, struct ip_address* output);
 struct ip_address string_to_ip(const char* addr);
 bool sockaddr_to_ip(struct sockaddr * addr, struct ip_address* output);
+#define IPV4_UINT32(x) (*(uint32_t*)&(x))
 
 #endif

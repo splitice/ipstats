@@ -205,3 +205,6 @@ FakesAssemblies/
 *.out
 *.app
 *.dat
+*.rdb
+
+CodeDB/*
