@@ -17,6 +17,9 @@
 #ifndef __FLT_MIN__
 #define __FLT_MIN__ 1.17549435082228750797e-38F
 #endif
+#ifndef __GCC_IEC_559_COMPLEX
+#define __GCC_IEC_559_COMPLEX 2
+#endif
 #ifndef __UINT_LEAST8_TYPE__
 #define __UINT_LEAST8_TYPE__ unsigned char
 #endif
@@ -56,11 +59,17 @@
 #ifndef __GCC_ATOMIC_CHAR_LOCK_FREE
 #define __GCC_ATOMIC_CHAR_LOCK_FREE 2
 #endif
+#ifndef __GCC_IEC_559
+#define __GCC_IEC_559 2
+#endif
 #ifndef __FLT_EVAL_METHOD__
 #define __FLT_EVAL_METHOD__ 0
 #endif
 #ifndef __unix__
 #define __unix__ 1
+#endif
+#ifndef __cpp_binary_literals
+#define __cpp_binary_literals 201304
 #endif
 #ifndef __GCC_ATOMIC_CHAR32_T_LOCK_FREE
 #define __GCC_ATOMIC_CHAR32_T_LOCK_FREE 2
@@ -113,6 +122,9 @@
 #ifndef __DEC32_EPSILON__
 #define __DEC32_EPSILON__ 1E-6DF
 #endif
+#ifndef __OPTIMIZE__
+#define __OPTIMIZE__ 1
+#endif
 #ifndef __unix
 #define __unix 1
 #endif
@@ -145,6 +157,9 @@
 #endif
 #ifndef __SIZEOF_POINTER__
 #define __SIZEOF_POINTER__ 8
+#endif
+#ifndef NDEBUG
+#define NDEBUG 1
 #endif
 #ifndef __GCC_ATOMIC_CHAR16_T_LOCK_FREE
 #define __GCC_ATOMIC_CHAR16_T_LOCK_FREE 2
@@ -187,6 +202,9 @@
 #endif
 #ifndef __gnu_linux__
 #define __gnu_linux__ 1
+#endif
+#ifndef RELEASE
+#define RELEASE 1
 #endif
 #ifndef __LDBL_HAS_QUIET_NAN__
 #define __LDBL_HAS_QUIET_NAN__ 1
@@ -318,14 +336,11 @@
 #ifndef __UINT8_TYPE__
 #define __UINT8_TYPE__ unsigned char
 #endif
-#ifndef __NO_INLINE__
-#define __NO_INLINE__ 1
-#endif
 #ifndef __FLT_MANT_DIG__
 #define __FLT_MANT_DIG__ 24
 #endif
 #ifndef __VERSION__
-#define __VERSION__ "4.8.2"
+#define __VERSION__ "4.9.2"
 #endif
 #ifndef _STDC_PREDEF_H
 #define _STDC_PREDEF_H 1
@@ -561,9 +576,6 @@
 #ifndef __INT_LEAST8_MAX__
 #define __INT_LEAST8_MAX__ 127
 #endif
-#ifndef __SSP__
-#define __SSP__ 1
-#endif
 #ifndef __SIZEOF_INT128__
 #define __SIZEOF_INT128__ 16
 #endif
@@ -637,7 +649,7 @@
 #define __ATOMIC_CONSUME 1
 #endif
 #ifndef __GNUC_MINOR__
-#define __GNUC_MINOR__ 8
+#define __GNUC_MINOR__ 9
 #endif
 #ifndef __UINTMAX_MAX__
 #define __UINTMAX_MAX__ 18446744073709551615UL
@@ -714,27 +726,21 @@
 #ifndef __ATOMIC_RELEASE
 #define __ATOMIC_RELEASE 3
 #endif
-#ifndef NDEBUG
-#define NDEBUG 
-#endif
-#ifndef RELEASE
-#define RELEASE 
-#endif
 #endif
 
 // --- Include directories begin --- //
-///usr/include/c++/4.8
-///usr/include/x86_64-linux-gnu/c++/4.8
-///usr/include/c++/4.8/backward
-///usr/lib/gcc/x86_64-linux-gnu/4.8/include
+///usr/include/c++/4.9
+///usr/include/x86_64-linux-gnu/c++/4.9
+///usr/include/c++/4.9/backward
+///usr/lib/gcc/x86_64-linux-gnu/4.9/include
 ///usr/local/include
-///usr/lib/gcc/x86_64-linux-gnu/4.8/include-fixed
+///usr/lib/gcc/x86_64-linux-gnu/4.9/include-fixed
 ///usr/include/x86_64-linux-gnu
 ///usr/include
 // --- Include directories end --- //
 
 
 // --- Library directories begin --- //
-///usr/lib/gcc/x86_64-linux-gnu/4.8/:/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../:/lib/:/usr/lib/
+///usr/lib/gcc/x86_64-linux-gnu/4.9/:/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../:/lib/:/usr/lib/
 // --- Library directories begin --- //
 
