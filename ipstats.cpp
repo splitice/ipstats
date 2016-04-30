@@ -150,7 +150,7 @@ void output_stats(){
 	next_time = tv.tv_sec + TIME_INTERVAL;
 	packet_counter = 0;
 	
-	int written = printf("#DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
+	int written = printf("#TIMESTAMP DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
 	if (written < 0){
 		exit(2);
 	}
