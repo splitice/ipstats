@@ -65,6 +65,7 @@ typedef struct ipstat_entry_s {
 	ipstat_directional_counters out;
 	struct ip_address ip;
 	bool used;
+	bool isnew;
 } ipstat_entry;
 
 typedef struct eth_def_s
@@ -116,6 +117,7 @@ ipstat_entry ** pages[PAGES];  // list of pages,
 u_int16_t packet_counter = 0; 
 u_int16_t packet_output_count = 1;//Start by outputting empty counters after the first packet
 time_t next_time = 0;
+time_t prev_time = 0;
 
 #define TIME_INTERVAL 30
 #define PACKET_SAMPLING_RATE 5
@@ -131,7 +133,6 @@ uint32_t ipv6_hash(const ipv6_address& ip){
 	uint32_t* thirtytwos = (uint32_t*)&ip;
 	return thirtytwos[0] ^ thirtytwos[1] ^ thirtytwos[2] ^ thirtytwos[3];
 }
-
 
 /* Output stats */
 void output_stats(){
@@ -169,9 +170,21 @@ void output_stats(){
 			clear = false;
 			
 			const char* ip = ip_to_string(c->ip);
+			
+			if (c->isnew && prev_time != 0)
+			{
+				printf("%u IN %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+					prev_time,
+					ip);
+				printf("%u OUT %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+					prev_time,
+					ip);
+				c->isnew = false;
+			}
 
 			//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
-			printf("IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+			printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+				tv.tv_sec,
 				ip,
 				c->in.tcp.packets,
 				c->in.tcp.bytes,
@@ -187,7 +200,8 @@ void output_stats(){
 				c->in.ipsec.bytes,
 				c->in.other.packets,
 				c->in.other.bytes);
-			printf("OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+			printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
+				tv.tv_sec,
 				ip,
 				c->out.tcp.packets,
 				c->out.tcp.bytes,
@@ -220,6 +234,8 @@ void output_stats(){
 	
 	//Flush the output buffer
 	fflush(stdout);
+	
+	prev_time = tv.tv_sec;
 }
 
 /* Increment a counter */
@@ -302,6 +318,7 @@ void ipv4_handler(const u_char* packet, bool incomming)
 		memset(c, 0, sizeof(ipstat_entry));
 		c->ip.ver = 4;
 		memcpy(&c->ip.v4, &addr, sizeof(addr));
+		c->isnew = true;
 		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
 	}
 	else
@@ -354,6 +371,7 @@ void ipv6_handler(const u_char* packet, bool incomming)
 		memset(c, 0, sizeof(ipstat_entry));
 		c->ip.ver = 6;
 		memcpy(&c->ip.v6, &addr, sizeof(addr));
+		c->isnew = true;
 		pages[addr_idx >> 16][addr_idx & 0xFFFF] = c;
 	}
 	else
