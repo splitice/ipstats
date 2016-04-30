@@ -40,7 +40,6 @@
 #include <set>
 #include <math.h>
 #include "ip_address.h"
-#include "MurmurHash3.h"
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {

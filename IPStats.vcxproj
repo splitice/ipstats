@@ -68,13 +68,11 @@
   <ItemGroup>
     <ClCompile Include="ipstats.cpp" />
     <ClCompile Include="ip_address.cpp" />
-    <ClCompile Include="MurmurHash.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gcc_Debug.h" />
     <ClInclude Include="gcc_Release.h" />
     <ClInclude Include="ip_address.h" />
-    <ClInclude Include="MurmurHash3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

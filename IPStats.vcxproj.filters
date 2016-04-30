@@ -34,9 +34,6 @@
     <ClCompile Include="ipstats.cpp">
       <Filter>Source files</Filter>
     </ClCompile>
-    <ClCompile Include="MurmurHash.cpp">
-      <Filter>Source files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ip_address.h">
@@ -46,9 +43,6 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="gcc_Debug.h">
-      <Filter>Header files</Filter>
-    </ClInclude>
-    <ClInclude Include="MurmurHash3.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>
