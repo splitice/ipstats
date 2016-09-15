@@ -330,7 +330,7 @@ void ipv4_handler(const u_char* packet, bool incomming)
 	addr_idx = IPV4_UINT32(addr);
 	c = pages[addr_idx & 0xFFFF][addr_idx >> 16];
 
-	while (c != NULL && (c->ip.ver != 4 || memcmp(&c->ip.v4, &addr, sizeof(addr) != 0))
+	while (c != NULL && (c->ip.ver != 4 || memcmp(&c->ip.v4, &addr, sizeof(addr) != 0)))
 	{
 		last = c;
 		c = c->next;
