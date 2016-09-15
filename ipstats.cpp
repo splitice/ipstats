@@ -388,7 +388,7 @@ void ipv6_handler(const u_char* packet, bool incomming)
 	addr_idx = ipv6_hash(addr);
 	c = pages[addr_idx & 0xFFFF][addr_idx >> 16];
 
-	while (c != NULL && (c->ip.ver != 6 || memcmp(&c->ip.v6, &addr, sizeof(addr)) == 0))
+	while (c != NULL && (c->ip.ver != 6 || memcmp(&c->ip.v6, &addr, sizeof(addr) != 0)))
 	{
 		last = c;
 		c = c->next;
