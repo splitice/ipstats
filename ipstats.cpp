@@ -138,12 +138,13 @@ uint32_t ipv6_hash(const ipv6_address& ip){
 void output_stats(){
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	if (tv.tv_sec < next_time){
+	int difference = (int)(tv.tv_sec - next_time);
+	if (difference < -1){//Within 1 second 
 		packet_output_count += 100;
 		return;
 	}
-	else{
-		packet_output_count -= 50;
+	else if(difference > 1){
+		packet_output_count -= (packet_counter * difference) / (3 * (difference + TIME_INTERVAL));
 	}
 
 	//Next time to do work
@@ -160,7 +161,6 @@ void output_stats(){
 		ipstat_entry** p = pages[i];
 		if (p == sentinel)
 		{
-		
 			continue;
 		}
 		bool clear = true;
