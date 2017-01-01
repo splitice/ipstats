@@ -114,8 +114,8 @@ ipstat_entry ** pages[PAGES];  // list of pages,
                               // initialized so every element points to sentinel
 
 //Packet counting
-u_int16_t packet_counter = 0; 
-u_int16_t packet_output_count = 1;
+uint32_t packet_counter = 0; 
+uint32_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
 
