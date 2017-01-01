@@ -144,7 +144,11 @@ void output_stats(){
 		return;
 	}
 	else if(difference > 1){
-		packet_output_count -= (packet_counter * difference) / (3 * (difference + TIME_INTERVAL));
+		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
+		if(packet_output_count / 2 < temp) {
+			temp = packet_output_count / 2;
+		}
+		packet_output_count -= temp;
 	}
 
 	//Next time to do work
