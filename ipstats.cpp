@@ -120,7 +120,7 @@ time_t next_time = 0;
 time_t prev_time = 0;
 
 #define TIME_INTERVAL 15
-#define PACKET_SAMPLING_RATE 10
+#define PACKET_SAMPLING_RATE 150
 
 #ifdef PACKET_SAMPLING_RATE
 #define PACKET_INCREMENT PACKET_SAMPLING_RATE
