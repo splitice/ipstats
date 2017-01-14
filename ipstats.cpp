@@ -118,15 +118,9 @@ uint32_t packet_counter = 0;
 uint32_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
+uint32_t set_sampling_rate = 10;
 
 #define TIME_INTERVAL 15
-#define PACKET_SAMPLING_RATE 150
-
-#ifdef PACKET_SAMPLING_RATE
-#define PACKET_INCREMENT PACKET_SAMPLING_RATE
-#else
-#define PACKET_INCREMENT 1
-#endif
 
 /* Hash an IPv6 address */
 uint32_t ipv6_hash(const ipv6_address& ip){
@@ -257,6 +251,19 @@ void output_stats(){
 		}
 	}
 	
+	//Handling sampling rate adjustments
+	int sampling_rate = packet_counter / 100000;
+	if(sampling_rate < 1) sampling_rate = 1;
+	int sampling_difference = sampling_rate - set_sampling_rate;
+	if(sampling_difference < -10 || sampling_difference > 10){
+		int rc = pfring_set_sampling_rate(pd, sampling_rate);
+		if (rc < 0){
+			printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+		}else{
+			set_sampling_rate = (uint32_t)sampling_rate;
+		}
+	}
+	
 	//Flush the output buffer
 	fflush(stdout);
 	
@@ -265,8 +272,8 @@ void output_stats(){
 
 /* Increment a counter */
 inline void increment_counter(byte_packet_counter* counter, u_int16_t length){
-	counter->packets += PACKET_INCREMENT;
-	counter->bytes += length * PACKET_INCREMENT;
+	counter->packets += set_sampling_rate;
+	counter->bytes += length * set_sampling_rate;
 }
 
 /* Increment a counter for a protocol, in a direction */
@@ -485,13 +492,11 @@ pfring* open_pfring(const char* dev){
 		return NULL;
 	}
 
-#ifdef PACKET_SAMPLING_RATE
-	rc = pfring_set_sampling_rate(pd, PACKET_SAMPLING_RATE);
+	rc = pfring_set_sampling_rate(pd, set_sampling_rate);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
 		return NULL;
 	}
-#endif
 
 	return pd;
 }
