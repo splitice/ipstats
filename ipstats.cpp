@@ -129,13 +129,13 @@ uint32_t ipv6_hash(const ipv6_address& ip){
 }
 
 /* Output stats */
-void output_stats(){
+bool output_stats(){
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	int difference = (int)(tv.tv_sec - next_time);
 	if (difference < -1){//Within 1 second 
 		packet_output_count += 100;
-		return;
+		return false;
 	}
 	else if(difference > 1){
 		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
@@ -251,23 +251,12 @@ void output_stats(){
 		}
 	}
 	
-	//Handling sampling rate adjustments
-	int sampling_rate = packet_counter / 100000;
-	if(sampling_rate < 1) sampling_rate = 1;
-	int sampling_difference = sampling_rate - set_sampling_rate;
-	if(sampling_difference < -10 || sampling_difference > 10){
-		int rc = pfring_set_sampling_rate(pd, sampling_rate);
-		if (rc < 0){
-			printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
-		}else{
-			set_sampling_rate = (uint32_t)sampling_rate;
-		}
-	}
-	
 	//Flush the output buffer
 	fflush(stdout);
 	
 	prev_time = tv.tv_sec;
+	
+	return true;
 }
 
 /* Increment a counter */
@@ -432,7 +421,7 @@ void ipv6_handler(const u_char* packet, bool incomming)
 }
 
 /* Handle an ethernet packet */
-void ethernet_handler(const u_char* packet, const unsigned char* mac)
+bool ethernet_handler(const u_char* packet, const unsigned char* mac)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 	
@@ -444,7 +433,7 @@ void ethernet_handler(const u_char* packet, const unsigned char* mac)
 	else if (memcmp(eptr->ether_shost, mac, 6) != 0)
 	{
 		//Not a packet for us
-		return;
+		return false;
 	}
 
 	if (eptr->ether_type == hostorder_ipv4) {
@@ -455,13 +444,14 @@ void ethernet_handler(const u_char* packet, const unsigned char* mac)
 	}
 	else{
 		//We have no interest in non IP packets
-		return;
+		return false;
 	}
 
 	packet_counter++;
 	if (packet_counter >= packet_output_count){
-		output_stats();
+		return output_stats();
 	}
+	return false;
 }
 
 
@@ -588,7 +578,20 @@ void run_pfring(const char** dev, int ndev)
 			}
 			else if (rc > 0)
 			{
-				ethernet_handler(buffer, eth.mac);
+				if(ethernet_handler(buffer, eth.mac)){
+					//Handling sampling rate adjustments
+					int sampling_rate = packet_counter / 100000;
+					if(sampling_rate < 1) sampling_rate = 1;
+					int sampling_difference = sampling_rate - set_sampling_rate;
+					if(sampling_difference < -10 || sampling_difference > 10){
+						int rc = pfring_set_sampling_rate(pd, sampling_rate);
+						if (rc < 0){
+							printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+						}else{
+							set_sampling_rate = (uint32_t)sampling_rate;
+						}
+					}
+				}
 			}
 			else
 			{
