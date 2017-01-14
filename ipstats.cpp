@@ -41,6 +41,8 @@
 #include <math.h>
 #include "ip_address.h"
 
+#define DEFAULT_SAMPLING_RATE 5
+
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
 	u_int32_t bytes;
@@ -72,6 +74,7 @@ typedef struct eth_def_s
 {
 	pfring* ring;
 	unsigned char mac[6];
+	uint32_t sampling_rate;
 } eth_def;
 
 //Structure of an IP packet
@@ -118,7 +121,6 @@ uint32_t packet_counter = 0;
 uint32_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
-uint32_t set_sampling_rate = 10;
 
 #define TIME_INTERVAL 15
 
@@ -260,13 +262,13 @@ bool output_stats(){
 }
 
 /* Increment a counter */
-inline void increment_counter(byte_packet_counter* counter, u_int16_t length){
-	counter->packets += set_sampling_rate;
-	counter->bytes += length * set_sampling_rate;
+inline void increment_counter(byte_packet_counter* counter, u_int16_t length, uint32_t sampling_rate){
+	counter->packets += sampling_rate;
+	counter->bytes += length * sampling_rate;
 }
 
 /* Increment a counter for a protocol, in a direction */
-void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length){
+void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length, uint32_t sampling_rate){
 	byte_packet_counter* bp;
 
 	switch (protocol){
@@ -294,7 +296,7 @@ void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter
 		break;
 	}
 
-	increment_counter(bp, length);
+	increment_counter(bp, length, sampling_rate);
 }
 
 ipstat_entry** allocate_new_null_filled_page()
@@ -305,7 +307,7 @@ ipstat_entry** allocate_new_null_filled_page()
 }
 
 /* Handle an IPv4 packet */
-void ipv4_handler(const u_char* packet, bool incomming)
+void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 {
 	const struct ipv4_header* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
@@ -358,12 +360,12 @@ void ipv4_handler(const u_char* packet, bool incomming)
 	
 	counter = incomming ? &c->in : &c->out;
 
-	increment_direction(ip->ip_p, counter, len);
+	increment_direction(ip->ip_p, counter, len, sampling_rate);
 	c->used = true;
 }
 
 /* Handle an IPv6 Packet */
-void ipv6_handler(const u_char* packet, bool incomming)
+void ipv6_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 {
 	const struct ipv6_header* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
@@ -416,12 +418,12 @@ void ipv6_handler(const u_char* packet, bool incomming)
 	
 	counter = incomming ? &c->in : &c->out;
 	
-	increment_direction(ip->next_header, counter, len);
+	increment_direction(ip->next_header, counter, len, sampling_rate);
 	c->used = true;
 }
 
 /* Handle an ethernet packet */
-bool ethernet_handler(const u_char* packet, const unsigned char* mac)
+bool ethernet_handler(const u_char* packet, const unsigned char* mac, uint32_t sampling_rate)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 	
@@ -437,10 +439,10 @@ bool ethernet_handler(const u_char* packet, const unsigned char* mac)
 	}
 
 	if (eptr->ether_type == hostorder_ipv4) {
-		ipv4_handler(packet, incomming);
+		ipv4_handler(packet, incomming, sampling_rate);
 	}
 	else if (eptr->ether_type == hostorder_ipv6){
-		ipv6_handler(packet, incomming);
+		ipv6_handler(packet, incomming, sampling_rate);
 	}
 	else{
 		//We have no interest in non IP packets
@@ -482,7 +484,7 @@ pfring* open_pfring(const char* dev){
 		return NULL;
 	}
 
-	rc = pfring_set_sampling_rate(pd, set_sampling_rate);
+	rc = pfring_set_sampling_rate(pd, DEFAULT_SAMPLING_RATE);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
 		return NULL;
@@ -561,6 +563,7 @@ void run_pfring(const char** dev, int ndev)
 		
 		eth_def eth;
 		eth.ring = pd;
+		eth.sampling_rate = DEFAULT_SAMPLING_RATE;
 		get_mac(dev[i], eth.mac);
 		
 		fd_map[sfd] = eth;
@@ -578,17 +581,17 @@ void run_pfring(const char** dev, int ndev)
 			}
 			else if (rc > 0)
 			{
-				if(ethernet_handler(buffer, eth.mac)){
+				if(ethernet_handler(buffer, eth.mac, eth.sampling_rate)){
 					//Handling sampling rate adjustments
 					int sampling_rate = packet_counter / 100000;
 					if(sampling_rate < 1) sampling_rate = 1;
-					int sampling_difference = sampling_rate - set_sampling_rate;
+					int sampling_difference = sampling_rate - eth.sampling_rate;
 					if(sampling_difference < -10 || sampling_difference > 10){
-						int rc = pfring_set_sampling_rate(pd, sampling_rate);
+						int rc = pfring_set_sampling_rate(eth.ring, sampling_rate);
 						if (rc < 0){
 							printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
 						}else{
-							set_sampling_rate = (uint32_t)sampling_rate;
+							eth.sampling_rate = (uint32_t)sampling_rate;
 						}
 					}
 				}
