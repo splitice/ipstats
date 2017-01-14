@@ -41,7 +41,8 @@
 #include <math.h>
 #include "ip_address.h"
 
-#define DEFAULT_SAMPLING_RATE 5
+#define SAMPLES_DEFAULT_RATE 5
+#define SAMPLES_DESIRED 100000
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
@@ -484,7 +485,7 @@ pfring* open_pfring(const char* dev){
 		return NULL;
 	}
 
-	rc = pfring_set_sampling_rate(pd, DEFAULT_SAMPLING_RATE);
+	rc = pfring_set_sampling_rate(pd, SAMPLES_DEFAULT_RATE);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
 		return NULL;
@@ -563,7 +564,7 @@ void run_pfring(const char** dev, int ndev)
 		
 		eth_def eth;
 		eth.ring = pd;
-		eth.sampling_rate = DEFAULT_SAMPLING_RATE;
+		eth.sampling_rate = SAMPLES_DEFAULT_RATE;
 		get_mac(dev[i], eth.mac);
 		
 		fd_map[sfd] = eth;
@@ -583,7 +584,7 @@ void run_pfring(const char** dev, int ndev)
 			{
 				if(ethernet_handler(buffer, eth.mac, eth.sampling_rate)){
 					//Handling sampling rate adjustments
-					int sampling_rate = packet_counter / 100000;
+					int sampling_rate = packet_counter / SAMPLES_DESIRED;
 					if(sampling_rate < 1) sampling_rate = 1;
 					int sampling_difference = sampling_rate - eth.sampling_rate;
 					if(sampling_difference < -10 || sampling_difference > 10){
