@@ -538,7 +538,7 @@ void run_pfring(const char** dev, int ndev)
 	int epfd;
 	struct epoll_event event;
 	struct epoll_event events[4];
-	std::map<int, eth_def> fd_map;
+	std::map<int, eth_def*> fd_map;
 	bool running = true;
 	int res;
 
@@ -562,52 +562,75 @@ void run_pfring(const char** dev, int ndev)
 			return;
 		}
 		
-		eth_def eth;
-		eth.ring = pd;
-		eth.sampling_rate = SAMPLES_DEFAULT_RATE;
-		get_mac(dev[i], eth.mac);
+		eth_def* eth = (eth_def*)malloc(sizeof(eth_def));
+		eth->ring = pd;
+		eth->sampling_rate = SAMPLES_DEFAULT_RATE;
+		get_mac(dev[i], eth->mac);
 		
 		fd_map[sfd] = eth;
 	}
 
 	while (running){
 		int n = epoll_wait(epfd, events, 4, 500);
-		for (int i = 0; i < n; i++)
+		if (n == 0)
 		{
-			eth_def eth = fd_map[events[i].data.fd];
-			int rc = pfring_recv(eth.ring, &buffer, 0, &hdr, 0);
-			if (rc == 0)
+			for (auto it = fd_map.begin(); it != fd_map.end(); it++)
 			{
-				continue;
+				eth_def* eth = it->second;
+				uint32_t sampling_rate = (uint32_t)eth->sampling_rate / 10;
+				if (sampling_rate == 0)
+				{
+					sampling_rate = 1;
+				}
+				int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
+				if (rc < 0) {
+					printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+				}
+				else {
+					eth->sampling_rate = (uint32_t)sampling_rate;
+				}
 			}
-			else if (rc > 0)
+		}
+		else
+		{
+			for (int i = 0; i < n; i++)
 			{
-				if(ethernet_handler(buffer, eth.mac, eth.sampling_rate)){
-					//Handling sampling rate adjustments
-					int sampling_rate = packet_counter / SAMPLES_DESIRED;
-					if(sampling_rate < 1) sampling_rate = 1;
-					int sampling_difference = sampling_rate - eth.sampling_rate;
-					if(sampling_difference < -10 || sampling_difference > 10){
-						int rc = pfring_set_sampling_rate(eth.ring, sampling_rate);
-						if (rc < 0){
-							printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
-						}else{
-							eth.sampling_rate = (uint32_t)sampling_rate;
+				eth_def* eth = fd_map[events[i].data.fd];
+				int rc = pfring_recv(eth->ring, &buffer, 0, &hdr, 0);
+				if (rc == 0)
+				{
+					continue;
+				}
+				else if (rc > 0)
+				{
+					if(ethernet_handler(buffer, eth->mac, eth->sampling_rate)){
+						//Handling sampling rate adjustments
+						int sampling_rate = packet_counter / SAMPLES_DESIRED;
+						if(sampling_rate < 1) sampling_rate = 1;
+						int sampling_difference = sampling_rate - eth->sampling_rate;
+						if(sampling_difference < -10 || sampling_difference > 10){
+							int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
+							if (rc < 0){
+								printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+							}else{
+								eth->sampling_rate = (uint32_t)sampling_rate;
+							}
 						}
 					}
 				}
-			}
-			else
-			{
-				printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
-				running = false;
-				break;
-			}
+				else
+				{
+					printf("#Error: A PF_RING error occured while recving: %s rc:%d\n", strerror(errno), rc);
+					running = false;
+					break;
+				}
+			}	
 		}
 	}
 
-	for (std::map<int, eth_def>::iterator it = fd_map.begin(); it != fd_map.end(); it++) {
-		pfring_close(it->second.ring);
+	for (std::map<int, eth_def*>::iterator it = fd_map.begin(); it != fd_map.end(); it++) {
+		pfring_close(it->second->ring);
+		free(it->second);
 	}
 	
 	close(epfd);
