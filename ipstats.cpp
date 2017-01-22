@@ -574,7 +574,7 @@ void run_pfring(const char** dev, int ndev)
 		int n = epoll_wait(epfd, events, 4, 500);
 		if (n == 0)
 		{
-			for (auto it = fd_map.begin(); it != fd_map.end(); it++)
+			for (std::map<int, eth_def*>::iterator it = fd_map.begin(); it != fd_map.end(); it++)
 			{
 				eth_def* eth = it->second;
 				uint32_t sampling_rate = (uint32_t)eth->sampling_rate / 10;
