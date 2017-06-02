@@ -42,7 +42,7 @@
 #include "ip_address.h"
 
 #define SAMPLES_DEFAULT_RATE 5
-#define SAMPLES_DESIRED 100000
+#define SAMPLES_DESIRED 15000
 
 /* Structure for conting bytes and packets */
 typedef struct byte_packet_counter_s {
@@ -75,6 +75,7 @@ typedef struct eth_def_s
 {
 	pfring* ring;
 	unsigned char mac[6];
+	bool zc;
 	uint32_t sampling_rate;
 } eth_def;
 
@@ -535,6 +536,7 @@ void run_pfring(const char** dev, int ndev)
 {
 	u_char* buffer;
 	pfring_pkthdr hdr;
+	pfring_card_settings settings;
 	int epfd;
 	struct epoll_event event;
 	struct epoll_event events[4];
@@ -567,6 +569,11 @@ void run_pfring(const char** dev, int ndev)
 		eth->sampling_rate = SAMPLES_DEFAULT_RATE;
 		get_mac(dev[i], eth->mac);
 		
+		eth->zc = false;
+		if (pd->zc_device) {
+			eth->zc = true;			
+		}
+		
 		fd_map[sfd] = eth;
 	}
 
@@ -596,7 +603,7 @@ void run_pfring(const char** dev, int ndev)
 			for (int i = 0; i < n; i++)
 			{
 				eth_def* eth = fd_map[events[i].data.fd];
-				int rc = pfring_recv(eth->ring, &buffer, 0, &hdr, 0);
+				int rc = pfring_recv(eth->ring, &buffer, eth->zc ? 0 : 94, &hdr, 0);
 				if (rc == 0)
 				{
 					continue;
