@@ -534,7 +534,8 @@ void get_mac(const char* name, unsigned char* mac_address)
 /* Process packets using PF_RING */
 void run_pfring(const char** dev, int ndev)
 {
-	u_char* buffer;
+	uchar _buffer[95];
+	u_char* buffer = &_buffer;
 	pfring_pkthdr hdr;
 	pfring_card_settings settings;
 	int epfd;
