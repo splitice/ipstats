@@ -569,7 +569,7 @@ void run_pfring(const char** dev, int ndev)
 		}
 		
 		if(sfd >= fd_size){
-			fd_map = realloc(fd_map, sizeof(eth_def) * (sfd + 8));
+			fd_map = (eth_def*)realloc(fd_map, sizeof(eth_def) * (sfd + 8));
 			memset(fd_map + fd_size,0,8 * sizeof(eth_def));
 			fd_size = sfd + 8;
 		}
