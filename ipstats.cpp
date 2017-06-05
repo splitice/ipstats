@@ -36,8 +36,6 @@
 #include <net/if.h> 
 #include <unistd.h>
 #include <netinet/in.h>
-#include <map>
-#include <set>
 #include <math.h>
 #include "ip_address.h"
 
@@ -544,7 +542,9 @@ void run_pfring(const char** dev, int ndev)
 	int epfd;
 	struct epoll_event event;
 	struct epoll_event events[4];
-	std::map<int, eth_def*> fd_map;
+	int fd_size = 8;
+	eth_def* fd_map = (eth_def*)malloc(fd_size * sizeof(eth_def));
+	memset(fd_map,0,fd_size * sizeof(eth_def));
 	bool running = true;
 	int res;
 
@@ -568,26 +568,30 @@ void run_pfring(const char** dev, int ndev)
 			return;
 		}
 		
-		eth_def* eth = (eth_def*)malloc(sizeof(eth_def));
-		eth->ring = pd;
-		eth->sampling_rate = SAMPLES_DEFAULT_RATE;
-		get_mac(dev[i], eth->mac);
-		
-		eth->zc = false;
-		if (pd->zc_device) {
-			eth->zc = true;			
+		if(sfd >= fd_size){
+			fd_map = realloc(fd_map, sizeof(eth_def) * (sfd + 8))
+			memset(fd_map + fd_size,0,8 * sizeof(eth_def));
+			fd_size = sfd + 8;
 		}
 		
-		fd_map[sfd] = eth;
+		fd_map[sfd].ring = pd;
+		fd_map[sfd].sampling_rate = SAMPLES_DEFAULT_RATE;
+		get_mac(dev[i], eth->mac);
+		
+		fd_map[sfd].zc = false;
+		if (pd->zc_device) {
+			fd_map[sfd].zc = true;			
+		}
 	}
 
 	while (running){
 		int n = epoll_wait(epfd, events, 4, 500);
 		if (n == 0)
 		{
-			for (std::map<int, eth_def*>::iterator it = fd_map.begin(); it != fd_map.end(); it++)
+			for (int i=0;i<fd_size; it++)
 			{
-				eth_def* eth = it->second;
+				eth_def* eth = &fd_map[i];
+				if(!eth->ring) continue;
 				uint32_t sampling_rate = (uint32_t)eth->sampling_rate / 10;
 				if (sampling_rate == 0)
 				{
@@ -606,7 +610,7 @@ void run_pfring(const char** dev, int ndev)
 		{
 			for (int i = 0; i < n; i++)
 			{
-				eth_def* eth = fd_map[events[i].data.fd];
+				eth_def* eth = &fd_map[events[i].data.fd];
 				int rc = pfring_recv(eth->ring, &buffer, eth->zc ? 0 : 94, &hdr, 0);
 				if (rc == 0)
 				{
@@ -640,9 +644,11 @@ void run_pfring(const char** dev, int ndev)
 		}
 	}
 
-	for (std::map<int, eth_def*>::iterator it = fd_map.begin(); it != fd_map.end(); it++) {
-		pfring_close(it->second->ring);
-		free(it->second);
+	for (int i=0;i<fd_size; it++)
+	{
+		eth_def* eth = &fd_map[i];
+		if(!eth->ring) continue;
+		pfring_close(eth->ring);
 	}
 	
 	close(epfd);
