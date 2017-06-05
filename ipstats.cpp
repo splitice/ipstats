@@ -133,13 +133,15 @@ uint32_t ipv6_hash(const ipv6_address& ip){
 }
 
 /* Output stats */
-bool output_stats(){
+uint32_t output_stats(){
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	int difference = (int)(tv.tv_sec - next_time);
+	uint32_t ret = 0;
+	
 	if (difference < -1){//Within 1 second 
 		packet_output_count += 100;
-		return false;
+		return 0;
 	}
 	else if(difference > 1){
 		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
@@ -151,6 +153,7 @@ bool output_stats(){
 
 	//Next time to do work
 	next_time = tv.tv_sec + TIME_INTERVAL;
+	ret = packet_counter;
 	packet_counter = 0;
 	
 	int written = printf("#TIMESTAMP DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
@@ -260,7 +263,7 @@ bool output_stats(){
 	
 	prev_time = tv.tv_sec;
 	
-	return true;
+	return ret;
 }
 
 /* Increment a counter */
@@ -425,7 +428,7 @@ void ipv6_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 }
 
 /* Handle an ethernet packet */
-bool ethernet_handler(const u_char* packet, const unsigned char* mac, uint32_t sampling_rate)
+uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32_t sampling_rate)
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 	
@@ -437,7 +440,7 @@ bool ethernet_handler(const u_char* packet, const unsigned char* mac, uint32_t s
 	else if (memcmp(eptr->ether_shost, mac, 6) != 0)
 	{
 		//Not a packet for us
-		return false;
+		return 0;
 	}
 
 	if (eptr->ether_type == hostorder_ipv4) {
@@ -448,14 +451,14 @@ bool ethernet_handler(const u_char* packet, const unsigned char* mac, uint32_t s
 	}
 	else{
 		//We have no interest in non IP packets
-		return false;
+		return 0;
 	}
 
 	packet_counter++;
 	if (packet_counter >= packet_output_count){
 		return output_stats();
 	}
-	return false;
+	return 0;
 }
 
 
@@ -611,9 +614,10 @@ void run_pfring(const char** dev, int ndev)
 				}
 				else if (rc > 0)
 				{
-					if(ethernet_handler(buffer, eth->mac, eth->sampling_rate)){
+					uint32_t packets = ethernet_handler(buffer, eth->mac, eth->sampling_rate);
+					if(packets){
 						//Handling sampling rate adjustments
-						int sampling_rate = packet_counter / SAMPLES_DESIRED;
+						int sampling_rate = (packets * eth->sampling_rate) / SAMPLES_DESIRED;
 						if(sampling_rate < 1) sampling_rate = 1;
 						int sampling_difference = sampling_rate - eth->sampling_rate;
 						if(sampling_difference < -10 || sampling_difference > 10){
