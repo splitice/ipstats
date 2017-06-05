@@ -569,14 +569,14 @@ void run_pfring(const char** dev, int ndev)
 		}
 		
 		if(sfd >= fd_size){
-			fd_map = realloc(fd_map, sizeof(eth_def) * (sfd + 8))
+			fd_map = realloc(fd_map, sizeof(eth_def) * (sfd + 8));
 			memset(fd_map + fd_size,0,8 * sizeof(eth_def));
 			fd_size = sfd + 8;
 		}
 		
 		fd_map[sfd].ring = pd;
 		fd_map[sfd].sampling_rate = SAMPLES_DEFAULT_RATE;
-		get_mac(dev[i], eth->mac);
+		get_mac(dev[i], fd_map[sfd].mac);
 		
 		fd_map[sfd].zc = false;
 		if (pd->zc_device) {
@@ -588,7 +588,7 @@ void run_pfring(const char** dev, int ndev)
 		int n = epoll_wait(epfd, events, 4, 500);
 		if (n == 0)
 		{
-			for (int i=0;i<fd_size; it++)
+			for (int i=0;i<fd_size; i++)
 			{
 				eth_def* eth = &fd_map[i];
 				if(!eth->ring) continue;
@@ -644,7 +644,7 @@ void run_pfring(const char** dev, int ndev)
 		}
 	}
 
-	for (int i=0;i<fd_size; it++)
+	for (int i=0;i<fd_size; i++)
 	{
 		eth_def* eth = &fd_map[i];
 		if(!eth->ring) continue;
