@@ -209,3 +209,4 @@ FakesAssemblies/
 *.rdb
 
 CodeDB/*
+.vs/

@@ -38,78 +38,20 @@
 #include <netinet/in.h>
 #include <math.h>
 #include "ip_address.h"
+#include "packets.h"
 
 #define SAMPLES_DEFAULT_RATE 5
 #define SAMPLES_DESIRED 15000
-
-/* Structure for conting bytes and packets */
-typedef struct byte_packet_counter_s {
-	u_int32_t bytes;
-	u_int32_t packets;
-} byte_packet_counter;
-
-/* Counters for bytes/packets tranferred in a direction */
-typedef struct ipstat_directional_counters_s {
-	byte_packet_counter gre;
-	byte_packet_counter ipip;
-	byte_packet_counter tcp;
-	byte_packet_counter udp;
-	byte_packet_counter icmp;
-	byte_packet_counter ipsec;
-	byte_packet_counter other;
-} ipstat_directional_counters;
+#define TIME_INTERVAL 15
 
 /* A statistical entry */
 typedef struct ipstat_entry_s {
 	ipstat_entry_s* next;
-	ipstat_directional_counters in;
-	ipstat_directional_counters out;
+	int fd;
 	struct ip_address ip;
 	bool used;
 	bool isnew;
 } ipstat_entry;
-
-typedef struct eth_def_s
-{
-	pfring* ring;
-	unsigned char mac[6];
-	bool zc;
-	uint32_t sampling_rate;
-} eth_def;
-
-//Structure of an IP packet
-struct ipv4_header {
-	u_int8_t        ip_vhl;          /* header length, version    */
-#define IP_V(ip)    (((ip)->ip_vhl & 0xf0) >> 4)
-#define IP_HL(ip)   ((ip)->ip_vhl & 0x0f)
-	u_int8_t        ip_tos;          /* type of service           */
-	u_int16_t       ip_len;          /* total length              */
-	u_int16_t       ip_id;           /* identification            */
-	u_int16_t       ip_off;          /* fragment offset field     */
-#define IP_DF 0x4000                 /* dont fragment flag        */
-#define IP_MF 0x2000                 /* more fragments flag       */
-#define IP_OFFMASK 0x1fff            /* mask for fragmenting bits */
-	u_int8_t        ip_ttl;          /* time to live              */
-	u_int8_t        ip_p;            /* protocol                  */
-	u_int16_t       ip_sum;          /* checksum                  */
-	struct  ipv4_address ip_src, ip_dst;  /* source and dest address   */
-};
-
-struct ipv6_header
-{
-	uint32_t        ip_vtcfl;	/* version then traffic class and flow label */
-#define IP6_V(ip)		(ntohl((ip)->ip_vtcfl) >> 28)
-	uint16_t length;
-	uint8_t  next_header;
-	uint8_t  hop_limit;
-	struct ipv6_address src;
-	struct ipv6_address dst;
-};
-
-//Packet helpers
-uint16_t hostorder_ipv4;
-uint16_t hostorder_ipv6;
-
 //Hash lookup
 #define PAGES 65536
 ipstat_entry *sentinel[PAGES] = { 0 };  // sentinel page, initialized to NULLs.
@@ -122,184 +64,14 @@ uint32_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
 
-#define TIME_INTERVAL 15
+//Packet helpers
+static uint16_t hostorder_ipv4;
+static uint16_t hostorder_ipv6;
 
 /* Hash an IPv6 address */
 uint32_t ipv6_hash(const ipv6_address& ip){
 	uint16_t* twos = (uint16_t*)&ip;
 	return twos[0] ^ twos[1] ^ twos[2] ^ twos[3] ^ ((twos[4] ^ twos[5] ^ twos[6] ^ twos[7]) >> 16);
-}
-
-/* Output stats */
-uint32_t output_stats(){
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	int difference = (int)(tv.tv_sec - next_time);
-	uint32_t ret = 0;
-	
-	if (difference < -1){//Within 1 second 
-		packet_output_count += 100;
-		return 0;
-	}
-	else if(difference > 1){
-		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
-		if(packet_output_count / 2 < temp) {
-			temp = packet_output_count / 2;
-		}
-		packet_output_count -= temp;
-	}
-
-	//Next time to do work
-	next_time = tv.tv_sec + TIME_INTERVAL;
-	ret = packet_counter;
-	packet_counter = 0;
-	
-	int written = printf("#TIMESTAMP DIRECTION IP TCP UDP GRE IPIP ICMP IPSEC OTHER\n");
-	if (written < 0){
-		exit(2);
-	}
-	
-	//Output for every IP (IN+OUT)
-	for (int i = 0; i < PAGES; i++) {
-		ipstat_entry** p = pages[i];
-		if (p == sentinel)
-		{
-			continue;
-		}
-		bool clear = true;
-		for (int f = 0; f < PAGES; f++)
-		{
-			ipstat_entry* prev = NULL;
-			ipstat_entry* c = pages[i][f];
-			while (c != NULL)
-			{
-				clear = false;
-			
-				const char* ip = ip_to_string(c->ip);
-			
-				if (c->isnew && prev_time != 0)
-				{
-					printf("%u IN %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-						prev_time,
-						ip);
-					printf("%u OUT %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-						prev_time,
-						ip);
-					c->isnew = false;
-				}
-
-				//DIR TCP UDP GRE IPIP ICMP IPSEC OTHER
-				printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
-					tv.tv_sec,
-					ip,
-					c->in.tcp.packets/TIME_INTERVAL,
-					c->in.tcp.bytes/TIME_INTERVAL,
-					c->in.udp.packets/TIME_INTERVAL,
-					c->in.udp.bytes/TIME_INTERVAL,
-					c->in.gre.packets/TIME_INTERVAL,
-					c->in.gre.bytes/TIME_INTERVAL,
-					c->in.ipip.packets/TIME_INTERVAL,
-					c->in.ipip.bytes/TIME_INTERVAL,
-					c->in.icmp.packets/TIME_INTERVAL,
-					c->in.icmp.bytes/TIME_INTERVAL,
-					c->in.ipsec.packets/TIME_INTERVAL,
-					c->in.ipsec.bytes/TIME_INTERVAL,
-					c->in.other.packets/TIME_INTERVAL,
-					c->in.other.bytes/TIME_INTERVAL);
-				printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
-					tv.tv_sec,
-					ip,
-					c->out.tcp.packets/TIME_INTERVAL,
-					c->out.tcp.bytes/TIME_INTERVAL,
-					c->out.udp.packets/TIME_INTERVAL,
-					c->out.udp.bytes/TIME_INTERVAL,
-					c->out.gre.packets/TIME_INTERVAL,
-					c->out.gre.bytes/TIME_INTERVAL,
-					c->out.ipip.packets/TIME_INTERVAL,
-					c->out.ipip.bytes/TIME_INTERVAL,
-					c->out.icmp.packets/TIME_INTERVAL,
-					c->out.icmp.bytes/TIME_INTERVAL,
-					c->out.ipsec.packets/TIME_INTERVAL,
-					c->out.ipsec.bytes/TIME_INTERVAL,
-					c->out.other.packets/TIME_INTERVAL,
-					c->out.other.bytes/TIME_INTERVAL);
-			
-				ipstat_entry* next = c->next;
-				if (!c->used)
-				{
-					if (prev == NULL)
-					{
-						pages[i][f] = c->next;
-						free(c);
-						c = NULL;
-					}
-					else
-					{
-						prev->next = c->next;
-						free(c);
-					}
-				}
-				else
-				{
-					memset(&c->out, 0, sizeof(c->out));
-					memset(&c->in, 0, sizeof(c->in));
-				}
-				prev = c;
-				c = next;
-			}
-		}
-		
-		if (clear)
-		{
-			free(pages[i]);
-			pages[i] = sentinel;
-		}
-	}
-	
-	//Flush the output buffer
-	fflush(stdout);
-	
-	prev_time = tv.tv_sec;
-	
-	return ret;
-}
-
-/* Increment a counter */
-inline void increment_counter(byte_packet_counter* counter, u_int16_t length, uint32_t sampling_rate){
-	counter->packets += sampling_rate;
-	counter->bytes += length * sampling_rate;
-}
-
-/* Increment a counter for a protocol, in a direction */
-void increment_direction(u_int8_t protocol, ipstat_directional_counters* counter, u_int16_t length, uint32_t sampling_rate){
-	byte_packet_counter* bp;
-
-	switch (protocol){
-	case IPPROTO_TCP:
-		bp = &counter->tcp;
-		break;
-	case IPPROTO_UDP:
-		bp = &counter->udp;
-		break;
-	case IPPROTO_GRE:
-		bp = &counter->gre;
-		break;
-	case IPPROTO_IPIP:
-		bp = &counter->ipip;
-		break;
-	case IPPROTO_ICMP:
-		bp = &counter->icmp;
-		break;
-	case IPPROTO_ESP:
-	case IPPROTO_AH:
-		bp = &counter->ipsec;
-		break;
-	default:
-		bp = &counter->other;
-		break;
-	}
-
-	increment_counter(bp, length, sampling_rate);
 }
 
 ipstat_entry** allocate_new_null_filled_page()
@@ -309,8 +81,23 @@ ipstat_entry** allocate_new_null_filled_page()
 	return page;
 }
 
+void handle_packet(const ipv4_header* ip, ipstat_entry* entry, uint16_t len)
+{
+	const u_char* packet = (const u_char*)ip;
+	const u_char* to_store = packet;
+	uint8_t len8;
+
+	if (len > 64) {
+		len = 63;
+	}
+	len8 = (uint8_t)len;
+
+	write(entry->fd, &len8, 1);
+	write(entry->fd, to_store, len);
+}
+
 /* Handle an IPv4 packet */
-void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
+void ipv4_handler(const u_char* packet, bool incoming, uint32_t sampling_rate)
 {
 	const struct ipv4_header* ip;   /* packet structure         */
 	u_int version;               /*  version                 */
@@ -318,7 +105,6 @@ void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 	u_int32_t addr_idx;
 	ipstat_entry* c;
 	ipstat_entry* last = NULL;
-	ipstat_directional_counters* counter;
 
 	//IP Header
 	ip = (struct ipv4_header*)(packet + sizeof(struct ether_header));
@@ -329,7 +115,7 @@ void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 		return;
 	}
 	
-	struct ipv4_address addr = incomming ? ip->ip_dst : ip->ip_src;
+	struct ipv4_address addr = incoming ? ip->ip_dst : ip->ip_src;
 
 	//Get the src bucket
 	addr_idx = IPV4_UINT32(addr);
@@ -360,69 +146,14 @@ void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 			last->next = c;
 		}
 	}
-	
-	counter = incomming ? &c->in : &c->out;
 
-	increment_direction(ip->ip_p, counter, len, sampling_rate);
+	handle_packet(ip, c, len);
 	c->used = true;
 }
 
 /* Handle an IPv6 Packet */
-void ipv6_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
+void ipv6_handler(const u_char* packet, bool incoming, uint32_t sampling_rate)
 {
-	const struct ipv6_header* ip;   /* packet structure         */
-	u_int version;               /*  version                 */
-	u_int16_t len;               /* length holder            */
-	ipstat_directional_counters* counter;
-	u_int32_t addr_idx;
-	ipstat_entry* c;
-	ipstat_entry* last = NULL;
-
-	//IP Header
-	ip = (struct ipv6_header*)(packet + sizeof(struct ether_header));
-	len = ntohs(ip->length); /* get packet length */
-	version = IP6_V(ip);          /* get ip version    */
-
-	if (version != 6){
-		return;
-	}
-	
-	struct ipv6_address addr = incomming ? ip->dst : ip->src;
-
-	//Get the src bucket
-	addr_idx = ipv6_hash(addr);
-	c = pages[addr_idx & 0xFFFF][addr_idx >> 16];
-
-	while (c != NULL && (c->ip.ver != 6 || memcmp(&c->ip.v6, &addr, sizeof(addr) != 0)))
-	{
-		last = c;
-		c = c->next;
-	}
-	if (c == NULL)
-	{
-		c = (ipstat_entry*)malloc(sizeof(ipstat_entry));
-		memset(c, 0, sizeof(ipstat_entry));
-		c->ip.ver = 6;
-		memcpy(&c->ip.v6, &addr, sizeof(addr));
-		c->isnew = true;
-		if (last == NULL)
-		{
-			if (pages[addr_idx & 0xFFFF] == sentinel)
-			{
-				pages[addr_idx & 0xFFFF] = allocate_new_null_filled_page();
-			}
-			pages[addr_idx & 0xFFFF][addr_idx >> 16] = c;
-		}
-		else
-		{
-			last->next = c;
-		}		
-	}
-	
-	counter = incomming ? &c->in : &c->out;
-	
-	increment_direction(ip->next_header, counter, len, sampling_rate);
-	c->used = true;
 }
 
 /* Handle an ethernet packet */
@@ -430,32 +161,26 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 {
 	struct ether_header *eptr = (struct ether_header *) packet;
 	
-	bool incomming = false;
-	if (memcmp(eptr->ether_dhost, mac, 6) == 0)
+	if (memcmp(eptr->ether_dhost, mac, 6) != 0)
 	{
-		incomming = true;
-	}
-	else if (memcmp(eptr->ether_shost, mac, 6) != 0)
-	{
-		//Not a packet for us
+		//Not a packet for us, or outgoing
 		return 0;
 	}
 
-	if (eptr->ether_type == hostorder_ipv4) {
-		ipv4_handler(packet, incomming, sampling_rate);
+	if (eptr->ether_type == hostorder_ipv4)
+	{
+		ipv4_handler(packet, true, sampling_rate);
 	}
-	else if (eptr->ether_type == hostorder_ipv6){
-		ipv6_handler(packet, incomming, sampling_rate);
+	else if (eptr->ether_type == hostorder_ipv6)
+	{
+		ipv6_handler(packet, true, sampling_rate);
 	}
-	else{
+	else
+	{
 		//We have no interest in non IP packets
 		return 0;
 	}
 
-	packet_counter++;
-	if (packet_counter >= packet_output_count){
-		return output_stats();
-	}
 	return 0;
 }
 
