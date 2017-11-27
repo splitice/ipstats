@@ -113,5 +113,4 @@ void write_packet(struct ip_address ip, const char* packet, uint8_t length) {
 		memset(zero_buffer, 0, length);
 		write(it->second, zero_buffer, length);
 	}
-	fdatasync(it->second);
 }
