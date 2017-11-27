@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <math.h>
+#include <errno.h>
 #include "ip_address.h"
 #include "packets.h"
 
@@ -315,7 +316,7 @@ void run_pfring(const char** dev, int ndev)
 
 	while (running){
 		int n = epoll_wait(epfd, events, 4, 500);
-		if (n == 0)
+		if (n == 0 || (n == -1 && errno == EINTR))
 		{
 			for (int i=0;i<fd_size; i++)
 			{
