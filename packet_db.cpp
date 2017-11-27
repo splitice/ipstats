@@ -64,15 +64,29 @@ static void rotate_dbfile(struct ip_address ip) {
 
 static void open_dbfile(struct ip_address ip) {
 	char* filename = get_filename(ip);
-	int fd = open(filename, O_APPEND | O_CREAT);
+	int fd = open(filename, O_APPEND | O_CREAT | O_WRONLY);
 	assert(fd >= 0);
 	files[ip] = fd;
 	free(filename);
 }
 
+int fullwrite(int fd, const char* data, int length) {
+	int res;
+	int remaining = length;
+	do {
+		res = write(fd, data, remaining);
+		if (res == -1) {
+			return res;
+		}
+		data += res;
+		remaining -= length;
+	} while (remaining != 0);
+	return length;
+}
+
 void write_packet(struct ip_address ip, const char* packet, uint8_t length) {
-	puts("write");
 	char zero_buffer[PACKETDB_BYTES];
+	int res;
 	auto it = files.find(ip);
 	if (it == files.end()) {
 		open_dbfile(ip);
@@ -93,10 +107,11 @@ void write_packet(struct ip_address ip, const char* packet, uint8_t length) {
 	}
 	else 
 	{
-		write(it->second, &length, 1);
-		write(it->second, packet, length);
+		res = fullwrite(it->second, (const char*)&length, 1);
+		res = fullwrite(it->second, packet, length);
 		length = PACKETDB_BYTES - length;
 		memset(zero_buffer, 0, length);
 		write(it->second, zero_buffer, length);
 	}
+	fdatasync(it->second);
 }

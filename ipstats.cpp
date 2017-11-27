@@ -46,6 +46,12 @@
 #define SAMPLES_DEFAULT_RATE 5
 #define SAMPLES_DESIRED 15000
 #define TIME_INTERVAL 15
+#define CAPTURE_LENGTH 94
+#define PACKET_CAPTURE
+
+#ifdef PACKET_CAPTURE
+#define CAPTURE_LENGTH 196
+#endif
 
 /* A statistical entry */
 typedef struct ipstat_entry_s {
@@ -361,7 +367,7 @@ void run_pfring(const char** dev, int ndev)
 			for (int i = 0; i < n; i++)
 			{
 				eth_def* eth = &fd_map[events[i].data.fd];
-				int rc = pfring_recv(eth->ring, &buffer, eth->zc ? 0 : 94, &hdr, 0);
+				int rc = pfring_recv(eth->ring, &buffer, eth->zc ? 0 : CAPTURE_LENGTH, &hdr, 0);
 				if (rc == 0)
 				{
 					continue;
