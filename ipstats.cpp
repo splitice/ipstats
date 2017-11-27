@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include <arpa/inet.h>
 #include <net/ethernet.h>
@@ -41,6 +42,7 @@
 #include "ip_address.h"
 #include "packets.h"
 
+#define SAMPLES_DEFAULT_WATERMARK 16
 #define SAMPLES_DEFAULT_RATE 5
 #define SAMPLES_DESIRED 15000
 #define TIME_INTERVAL 15
@@ -189,6 +191,19 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 	return 0;
 }
 
+static uint32_t calculate_watermark(uint32_t sampling_rate) {
+	if (sampling_rate < 4) {
+		return SAMPLES_DEFAULT_WATERMARK;
+	}
+	if (sampling_rate < 32) {
+		return 256;
+	}
+	if (sampling_rate < 128) {
+		return 512;
+	}
+	return 1024;
+}
+
 
 pfring* open_pfring(const char* dev){
 	int rc;
@@ -211,7 +226,7 @@ pfring* open_pfring(const char* dev){
 		return NULL;
 	}
 
-	rc = pfring_set_poll_watermark(pd, 1024);
+	rc = pfring_set_poll_watermark(pd, SAMPLES_DEFAULT_WATERMARK);
 	if (rc < 0){
 		printf("#Error: A PF_RING error occured while setting the watermark: %s rc:%d\n", strerror(errno), rc);
 		return NULL;
@@ -333,6 +348,11 @@ void run_pfring(const char** dev, int ndev)
 				}
 				else {
 					eth->sampling_rate = (uint32_t)sampling_rate;
+
+					rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
+					if (rc < 0) {
+						printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
+					}
 				}
 			}
 		}
@@ -360,7 +380,14 @@ void run_pfring(const char** dev, int ndev)
 								printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
 							}else{
 								eth->sampling_rate = (uint32_t)sampling_rate;
+
+								rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
+								if (rc < 0) {
+									printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
+								}
 							}
+
+							
 						}
 					}
 				}
