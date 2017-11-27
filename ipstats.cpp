@@ -81,19 +81,23 @@ ipstat_entry** allocate_new_null_filled_page()
 	return page;
 }
 
+void write_packet(struct ip_address ip, const char* packet, uint8_t length);
+
 void handle_packet(const ipv4_header* ip, ipstat_entry* entry, uint16_t len)
 {
-	const u_char* packet = (const u_char*)ip;
-	const u_char* to_store = packet;
+	const char* packet = (const char*)ip;
 	uint8_t len8;
 
-	if (len > 64) {
-		len = 63;
+	if (len > 250) {
+		len = 250;
 	}
 	len8 = (uint8_t)len;
 
-	write(entry->fd, &len8, 1);
-	write(entry->fd, to_store, len);
+	ip_address ipa;
+	ipa.v4 = ip->ip_dst;
+	ipa.ver = 4;
+
+	write_packet(ipa, packet, len);
 }
 
 /* Handle an IPv4 packet */

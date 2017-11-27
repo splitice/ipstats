@@ -63,11 +63,17 @@
   <ItemGroup>
     <ClCompile Include="ipstats.cpp" />
     <ClCompile Include="ip_address.cpp" />
+    <ClCompile Include="packet_db.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ip_address.h" />
+    <ClInclude Include="packets.h" />
   </ItemGroup>
-  <ItemDefinitionGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Link>
+      <LibraryDependencies>pfring;pcap</LibraryDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
