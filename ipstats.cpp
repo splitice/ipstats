@@ -46,11 +46,12 @@
 #define SAMPLES_DEFAULT_RATE 5
 #define SAMPLES_DESIRED 15000
 #define TIME_INTERVAL 15
-#define CAPTURE_LENGTH 94
 #define PACKET_CAPTURE
 
 #ifdef PACKET_CAPTURE
 #define CAPTURE_LENGTH 196
+#else
+#define CAPTURE_LENGTH 94
 #endif
 
 /* A statistical entry */
