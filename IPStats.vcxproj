@@ -68,6 +68,7 @@
   <ItemGroup>
     <ClInclude Include="ip_address.h" />
     <ClInclude Include="packets.h" />
+    <ClInclude Include="packet_db.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>

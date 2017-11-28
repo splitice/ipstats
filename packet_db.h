@@ -7,4 +7,8 @@ struct packetdb_data {
 	uint16_t record;
 };
 
-void write_packet(struct ip_address ip, struct packetdb_data data, const char* packet, uint8_t length);
+template<class TIp>
+void packetdb_open_dbfile(TIp ip, struct packetdb_data* data);
+
+template<class TIp>
+void packetdb_write_packet(TIp ip, struct packetdb_data* data, const char* packet, uint8_t length);

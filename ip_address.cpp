@@ -13,15 +13,30 @@ const char* ip_to_string(const struct ip_address addr){
 	ip_to_string(addr, ip_address, sizeof(ip_address));
 	return ip_address;
 }
+const char* ip_to_string(const struct ipv4_address addr) {
+	ip_to_string(addr, ip_address, sizeof(ip_address));
+	return ip_address;
+}
+const char* ip_to_string(const struct ipv6_address addr) {
+	ip_to_string(addr, ip_address, sizeof(ip_address));
+	return ip_address;
+}
+
+void ip_to_string(const struct ipv4_address addr, char* output, int length) {
+	sprintf_s(output, length, "%d.%d.%d.%d", addr.byte1, addr.byte2, addr.byte3, addr.byte4);
+}
+void ip_to_string(const struct ipv6_address addr, char* output, int length) {
+	sprintf_s(output, length, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+		addr.byte1, addr.byte2, addr.byte3, addr.byte4, addr.byte5, addr.byte6, addr.byte7, addr.byte8,
+		addr.byte9, addr.byte10, addr.byte11, addr.byte12, addr.byte13, addr.byte14, addr.byte15, addr.byte16);
+}
 
 void ip_to_string(const struct ip_address addr, char* output, int length){
 	if (addr.ver == 4){
-		sprintf_s(output, length, "%d.%d.%d.%d", addr.v4.byte1, addr.v4.byte2, addr.v4.byte3, addr.v4.byte4);
+		ip_to_string(addr.v4, output, length);
 	}
 	else if (addr.ver == 6){
-		sprintf_s(output, length, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-			addr.v6.byte1, addr.v6.byte2, addr.v6.byte3, addr.v6.byte4, addr.v6.byte5, addr.v6.byte6, addr.v6.byte7, addr.v6.byte8,
-			addr.v6.byte9, addr.v6.byte10, addr.v6.byte11, addr.v6.byte12, addr.v6.byte13, addr.v6.byte14, addr.v6.byte15, addr.v6.byte16);
+		ip_to_string(addr.v6, output, length);
 	}
 	else{
 		sprintf_s(output, length, "Unknown IP Version");

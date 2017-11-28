@@ -38,7 +38,13 @@ struct ip_address
 };
 
 const char* ip_to_string(const struct ip_address addr);
+const char* ip_to_string(const struct ipv4_address addr);
+const char* ip_to_string(const struct ipv6_address addr);
+
 void ip_to_string(const struct ip_address addr, char* output, int length);
+void ip_to_string(const struct ipv4_address addr, char* output, int length);
+void ip_to_string(const struct ipv6_address addr, char* output, int length);
+
 bool string_to_ip(const char* addr, struct ip_address* output);
 struct ip_address string_to_ip(const char* addr);
 bool sockaddr_to_ip(struct sockaddr * addr, struct ip_address* output);

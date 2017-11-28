@@ -40,6 +40,7 @@
 #include <math.h>
 #include <errno.h>
 #include "ip_address.h"
+#include "packet_db.h"
 #include "packets.h"
 
 #define SAMPLES_DEFAULT_WATERMARK 16
@@ -76,46 +77,12 @@ typedef struct ipstat_entry_s {
 	ipstat_directional_counters in;
 	ipstat_directional_counters out;
 	struct ip_address ip;
+#ifdef PACKET_CAPTURE
+	struct packetdb_data packetdb;
+#endif
 	bool used;
 	bool isnew;
 } ipstat_entry;
-
-typedef struct eth_def_s
-{
-	pfring* ring;
-	unsigned char mac[6];
-	bool zc;
-	uint32_t sampling_rate;
-} eth_def;
-
-//Structure of an IP packet
-struct ipv4_header {
-	u_int8_t        ip_vhl;          /* header length, version    */
-#define IP_V(ip)    (((ip)->ip_vhl & 0xf0) >> 4)
-#define IP_HL(ip)   ((ip)->ip_vhl & 0x0f)
-	u_int8_t        ip_tos;          /* type of service           */
-	u_int16_t       ip_len;          /* total length              */
-	u_int16_t       ip_id;           /* identification            */
-	u_int16_t       ip_off;          /* fragment offset field     */
-#define IP_DF 0x4000                 /* dont fragment flag        */
-#define IP_MF 0x2000                 /* more fragments flag       */
-#define IP_OFFMASK 0x1fff            /* mask for fragmenting bits */
-	u_int8_t        ip_ttl;          /* time to live              */
-	u_int8_t        ip_p;            /* protocol                  */
-	u_int16_t       ip_sum;          /* checksum                  */
-	struct  ipv4_address ip_src, ip_dst;  /* source and dest address   */
-};
-
-struct ipv6_header
-{
-	uint32_t        ip_vtcfl;	/* version then traffic class and flow label */
-#define IP6_V(ip)		(ntohl((ip)->ip_vtcfl) >> 28)
-	uint16_t length;
-	uint8_t  next_header;
-	uint8_t  hop_limit;
-	struct ipv6_address src;
-	struct ipv6_address dst;
-};
 
 //Packet helpers
 uint16_t hostorder_ipv4;
@@ -358,6 +325,9 @@ void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 		c->ip.ver = 4;
 		memcpy(&c->ip.v4, &addr, sizeof(addr));
 		c->isnew = true;
+#ifdef PACKET_CAPTURE
+		packetdb_open_dbfile(ip->ip_dst, &c->packetdb);
+#endif
 		if (last == NULL)
 		{
 			if (pages[addr_idx & 0xFFFF] == sentinel)
@@ -375,6 +345,10 @@ void ipv4_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 	counter = incomming ? &c->in : &c->out;
 
 	increment_direction(ip->ip_p, counter, len, sampling_rate);
+#ifdef PACKET_CAPTURE
+	if (len > 255) len = 255;
+	packetdb_write_packet(ip->ip_dst, &c->packetdb, (char*)packet, (uint8_t)len);
+#endif
 	c->used = true;
 }
 
@@ -416,6 +390,9 @@ void ipv6_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 		c->ip.ver = 6;
 		memcpy(&c->ip.v6, &addr, sizeof(addr));
 		c->isnew = true;
+#ifdef PACKET_CAPTURE
+		packetdb_open_dbfile(ip->dst, &c->packetdb);
+#endif
 		if (last == NULL)
 		{
 			if (pages[addr_idx & 0xFFFF] == sentinel)
@@ -433,6 +410,10 @@ void ipv6_handler(const u_char* packet, bool incomming, uint32_t sampling_rate)
 	counter = incomming ? &c->in : &c->out;
 
 	increment_direction(ip->next_header, counter, len, sampling_rate);
+#ifdef PACKET_CAPTURE
+	if (len > 255) len = 255;
+	packetdb_write_packet(ip->dst, &c->packetdb, (char*)packet, (uint8_t)len);
+#endif
 	c->used = true;
 }
 
