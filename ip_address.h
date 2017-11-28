@@ -1,5 +1,6 @@
 #ifndef IPADDR_H
 #define IPADDR_H
+#pragma once
 #include <stdint.h>
 
 /* IPv4 or IPv6 address */

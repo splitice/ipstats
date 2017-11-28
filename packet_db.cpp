@@ -24,7 +24,12 @@ struct cmp_ip
 	}
 };
 
-static std::map<struct ip_address, int, struct cmp_ip> files;
+struct fd_data {
+	int fd;
+	uint16_t record;
+};
+
+static std::map<struct ip_address, struct fd_data*, struct cmp_ip> files;
 
 static bool file_exists(const char* filename) {
 	return (access(filename, F_OK) != -1);
@@ -92,25 +97,28 @@ void write_packet(struct ip_address ip, const char* packet, uint8_t length) {
 		open_dbfile(ip);
 		it = files.find(ip);
 	}
-	if (lseek(it->second, 0, SEEK_CUR) >= (PACKETDB_PERFILE * (PACKETDB_OVERHEAD + PACKETDB_BYTES))) {
+	auto fd_data = it->second;
+	if (fd_data->record++ == PACKETDB_PERFILE) {
 		rotate_dbfile(ip);
-		close(it->second);
+		close(fd_data->fd);
 		open_dbfile(ip);
 		it = files.find(ip);
+		fd_data = it->second;
+		fd_data->record = 1;
 	}
 
 	if (length >= PACKETDB_BYTES)
 	{
 		length = PACKETDB_BYTES;
-		write(it->second, &length, 1);
-		write(it->second, packet, PACKETDB_BYTES);
+		write(fd_data->fd, &length, 1);
+		write(fd_data->fd, packet, PACKETDB_BYTES);
 	}
 	else 
 	{
-		res = fullwrite(it->second, (const char*)&length, 1);
-		res = fullwrite(it->second, packet, length);
+		res = fullwrite(fd_data->fd, (const char*)&length, 1);
+		res = fullwrite(fd_data->fd, packet, length);
 		length = PACKETDB_BYTES - length;
 		memset(zero_buffer, 0, length);
-		write(it->second, zero_buffer, length);
+		write(fd_data->fd, zero_buffer, length);
 	}
 }
