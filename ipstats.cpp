@@ -241,11 +241,6 @@ uint32_t output_stats(){
 						free(c);
 					}
 				}
-				else
-				{
-					memset(&c->out, 0, sizeof(c->out));
-					memset(&c->in, 0, sizeof(c->in));
-				}
 				prev = c;
 				c = next;
 			}
