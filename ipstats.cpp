@@ -139,16 +139,12 @@ uint32_t output_stats(){
 	int difference = (int)(tv.tv_sec - next_time);
 	uint32_t ret = 0;
 	
-	if (difference < -1){//Within 1 second 
-		packet_output_count += 100;
-		return 0;
-	}
-	else if(difference > 1){
-		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
-		if(packet_output_count / 2 < temp) {
-			temp = packet_output_count / 2;
+	// Try and keep output time within 1 second of the target interval
+	if (difference < -1 || difference > 1){
+		packet_output_count += ((packet_output_count*2) / (TIME_INTERVAL*3)) * -difference;
+		if(difference < -1){
+			return 0;
 		}
-		packet_output_count -= temp;
 	}
 
 	//Next time to do work
@@ -542,6 +538,34 @@ void get_mac(const char* name, unsigned char* mac_address)
 	if (success) memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
 }
 
+void adjust_samplerate(uint32_t packets, eth_def* eth){
+	//Handling sampling rate adjustments
+	int sampling_rate = (packets * eth->sampling_rate) / SAMPLES_DESIRED;
+	if(sampling_rate < 1) sampling_rate = 1;
+	int sampling_difference = sampling_rate - eth->sampling_rate;
+	if(sampling_difference < -10 || sampling_difference > 10){
+		/* Don't get too big during a burst in traffic. Otherwise the rate will jump too rapidly */
+		if(sampling_difference < -30){
+			sampling_difference = -30;
+		}else if(sampling_difference > 30){
+			sampling_difference = 30;
+		}
+		sampling_rate = eth->sampling_rate + sampling_difference;
+		
+		int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
+		if (rc < 0){
+			printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+		}else{
+			eth->sampling_rate = (uint32_t)sampling_rate;
+
+			rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
+			if (rc < 0) {
+				printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
+			}
+		}
+	}
+}
+
 /* Process packets using PF_RING */
 void run_pfring(const char** dev, int ndev)
 {
@@ -635,25 +659,7 @@ void run_pfring(const char** dev, int ndev)
 				{
 					uint32_t packets = ethernet_handler(buffer, eth->mac, eth->sampling_rate);
 					if(packets){
-						//Handling sampling rate adjustments
-						int sampling_rate = (packets * eth->sampling_rate) / SAMPLES_DESIRED;
-						if(sampling_rate < 1) sampling_rate = 1;
-						int sampling_difference = sampling_rate - eth->sampling_rate;
-						if(sampling_difference < -10 || sampling_difference > 10){
-							int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
-							if (rc < 0){
-								printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
-							}else{
-								eth->sampling_rate = (uint32_t)sampling_rate;
-
-								rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
-								if (rc < 0) {
-									printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
-								}
-							}
-
-							
-						}
+						adjust_samplerate(packets, eth);
 					}
 				}
 				else
