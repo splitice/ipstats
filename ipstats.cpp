@@ -194,37 +194,37 @@ uint32_t output_stats(){
 				printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
 					tv.tv_sec,
 					ip,
-					c->in.tcp.packets/TIME_INTERVAL,
-					c->in.tcp.bytes/TIME_INTERVAL,
-					c->in.udp.packets/TIME_INTERVAL,
-					c->in.udp.bytes/TIME_INTERVAL,
-					c->in.gre.packets/TIME_INTERVAL,
-					c->in.gre.bytes/TIME_INTERVAL,
-					c->in.ipip.packets/TIME_INTERVAL,
-					c->in.ipip.bytes/TIME_INTERVAL,
-					c->in.icmp.packets/TIME_INTERVAL,
-					c->in.icmp.bytes/TIME_INTERVAL,
-					c->in.ipsec.packets/TIME_INTERVAL,
-					c->in.ipsec.bytes/TIME_INTERVAL,
-					c->in.other.packets/TIME_INTERVAL,
-					c->in.other.bytes/TIME_INTERVAL);
+					c->in.tcp.packets,
+					c->in.tcp.bytes,
+					c->in.udp.packets,
+					c->in.udp.bytes,
+					c->in.gre.packets,
+					c->in.gre.bytes,
+					c->in.ipip.packets,
+					c->in.ipip.bytes,
+					c->in.icmp.packets,
+					c->in.icmp.bytes,
+					c->in.ipsec.packets,
+					c->in.ipsec.bytes,
+					c->in.other.packets,
+					c->in.other.bytes);
 				printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
 					tv.tv_sec,
 					ip,
-					c->out.tcp.packets/TIME_INTERVAL,
-					c->out.tcp.bytes/TIME_INTERVAL,
-					c->out.udp.packets/TIME_INTERVAL,
-					c->out.udp.bytes/TIME_INTERVAL,
-					c->out.gre.packets/TIME_INTERVAL,
-					c->out.gre.bytes/TIME_INTERVAL,
-					c->out.ipip.packets/TIME_INTERVAL,
-					c->out.ipip.bytes/TIME_INTERVAL,
-					c->out.icmp.packets/TIME_INTERVAL,
-					c->out.icmp.bytes/TIME_INTERVAL,
-					c->out.ipsec.packets/TIME_INTERVAL,
-					c->out.ipsec.bytes/TIME_INTERVAL,
-					c->out.other.packets/TIME_INTERVAL,
-					c->out.other.bytes/TIME_INTERVAL);
+					c->out.tcp.packets,
+					c->out.tcp.bytes,
+					c->out.udp.packets,
+					c->out.udp.bytes,
+					c->out.gre.packets,
+					c->out.gre.bytes,
+					c->out.ipip.packets,
+					c->out.ipip.bytes,
+					c->out.icmp.packets,
+					c->out.icmp.bytes,
+					c->out.ipsec.packets,
+					c->out.ipsec.bytes,
+					c->out.other.packets,
+					c->out.other.bytes);
 			
 				ipstat_entry* next = c->next;
 				if (!c->used)
@@ -269,7 +269,7 @@ uint32_t output_stats(){
 /* Increment a counter */
 inline void increment_counter(byte_packet_counter* counter, u_int16_t length, uint32_t sampling_rate){
 	counter->packets += sampling_rate;
-	counter->bytes += length * sampling_rate;
+	counter->bytes += sampling_rate * length;
 }
 
 /* Increment a counter for a protocol, in a direction */
