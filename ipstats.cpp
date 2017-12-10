@@ -433,20 +433,15 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 		//Not a packet for us
 		return 0;
 	}
-
+	
 	if (eptr->ether_type == hostorder_ipv4) {
 		ipv4_handler(packet, incomming, sampling_rate);
 	}
 	else if (eptr->ether_type == hostorder_ipv6){
 		ipv6_handler(packet, incomming, sampling_rate);
 	}
-	else{
-		//We have no interest in non IP packets
-		return 0;
-	}
 
-	packet_counter++;
-	if (packet_counter >= packet_output_count){
+	if (packet_counter++ >= packet_output_count){
 		return output_stats();
 	}
 	return 0;
@@ -698,7 +693,7 @@ int main(int argc, char **argv)
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
 	hostorder_ipv6 = ntohs(ETHERTYPE_IPV6);
 
-	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	printf("# Init complete. Starting\n");
 
 	run_pfring((const char**)(argv + 1), argc - 1);

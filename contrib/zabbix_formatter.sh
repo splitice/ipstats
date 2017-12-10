@@ -1,6 +1,11 @@
 #!/bin/bash
 # Usage: ipstats eth1 | bash contrib/zabbix_formatter.sh SERVER
 HOST="$1"
+if [ -z "$HOST" ]
+then
+        HOST="$HOSTNAME"
+fi
+
 function awk_script {
         echo -n "{"
         for ((i=1; i<${#@}; i+=2)); do
