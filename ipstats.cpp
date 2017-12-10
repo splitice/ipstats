@@ -431,7 +431,7 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 	else if (memcmp(eptr->ether_shost, mac, 6) != 0)
 	{
 		//Not a packet for us
-		return 0;
+		goto count;
 	}
 	
 	if (eptr->ether_type == hostorder_ipv4) {
@@ -441,6 +441,7 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 		ipv6_handler(packet, incomming, sampling_rate);
 	}
 
+	count:
 	if (packet_counter++ >= packet_output_count){
 		return output_stats();
 	}
