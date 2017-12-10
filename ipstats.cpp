@@ -114,17 +114,13 @@ uint32_t output_stats() {
 	gettimeofday(&tv, NULL);
 	int difference = (int)(tv.tv_sec - next_time);
 	uint32_t ret = 0;
-
-	if (difference < -1) {//Within 1 second 
-		packet_output_count += 100;
-		return 0;
-	}
-	else if (difference > 1) {
-		uint32_t temp = (uint32_t)(((float)packet_counter * difference) / (2 * (difference + TIME_INTERVAL)));
-		if (packet_output_count / 2 < temp) {
-			temp = packet_output_count / 2;
+	
+	// Try and keep output time within 1 second of the target interval
+	if (difference < -1 || difference > 1){
+		packet_output_count += ((packet_output_count*2) / (TIME_INTERVAL*3)) * -difference;
+		if(difference < -1){
+			return 0;
 		}
-		packet_output_count -= temp;
 	}
 
 	//Next time to do work
@@ -170,38 +166,38 @@ uint32_t output_stats() {
 				printf("%u IN %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
 					tv.tv_sec,
 					ip,
-					c->in.tcp.packets / TIME_INTERVAL,
-					c->in.tcp.bytes / TIME_INTERVAL,
-					c->in.udp.packets / TIME_INTERVAL,
-					c->in.udp.bytes / TIME_INTERVAL,
-					c->in.gre.packets / TIME_INTERVAL,
-					c->in.gre.bytes / TIME_INTERVAL,
-					c->in.ipip.packets / TIME_INTERVAL,
-					c->in.ipip.bytes / TIME_INTERVAL,
-					c->in.icmp.packets / TIME_INTERVAL,
-					c->in.icmp.bytes / TIME_INTERVAL,
-					c->in.ipsec.packets / TIME_INTERVAL,
-					c->in.ipsec.bytes / TIME_INTERVAL,
-					c->in.other.packets / TIME_INTERVAL,
-					c->in.other.bytes / TIME_INTERVAL);
+					c->in.tcp.packets,
+					c->in.tcp.bytes,
+					c->in.udp.packets,
+					c->in.udp.bytes,
+					c->in.gre.packets,
+					c->in.gre.bytes,
+					c->in.ipip.packets,
+					c->in.ipip.bytes,
+					c->in.icmp.packets,
+					c->in.icmp.bytes,
+					c->in.ipsec.packets,
+					c->in.ipsec.bytes,
+					c->in.other.packets,
+					c->in.other.bytes);
 				printf("%u OUT %s %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "\n",
 					tv.tv_sec,
 					ip,
-					c->out.tcp.packets / TIME_INTERVAL,
-					c->out.tcp.bytes / TIME_INTERVAL,
-					c->out.udp.packets / TIME_INTERVAL,
-					c->out.udp.bytes / TIME_INTERVAL,
-					c->out.gre.packets / TIME_INTERVAL,
-					c->out.gre.bytes / TIME_INTERVAL,
-					c->out.ipip.packets / TIME_INTERVAL,
-					c->out.ipip.bytes / TIME_INTERVAL,
-					c->out.icmp.packets / TIME_INTERVAL,
-					c->out.icmp.bytes / TIME_INTERVAL,
-					c->out.ipsec.packets / TIME_INTERVAL,
-					c->out.ipsec.bytes / TIME_INTERVAL,
-					c->out.other.packets / TIME_INTERVAL,
-					c->out.other.bytes / TIME_INTERVAL);
-
+					c->out.tcp.packets,
+					c->out.tcp.bytes,
+					c->out.udp.packets,
+					c->out.udp.bytes,
+					c->out.gre.packets,
+					c->out.gre.bytes,
+					c->out.ipip.packets,
+					c->out.ipip.bytes,
+					c->out.icmp.packets,
+					c->out.icmp.bytes,
+					c->out.ipsec.packets,
+					c->out.ipsec.bytes,
+					c->out.other.packets,
+					c->out.other.bytes);
+			
 				ipstat_entry* next = c->next;
 				if (!c->used)
 				{
@@ -216,11 +212,6 @@ uint32_t output_stats() {
 						prev->next = c->next;
 						free(c);
 					}
-				}
-				else
-				{
-					memset(&c->out, 0, sizeof(c->out));
-					memset(&c->in, 0, sizeof(c->in));
 				}
 				prev = c;
 				c = next;
@@ -245,7 +236,7 @@ uint32_t output_stats() {
 /* Increment a counter */
 inline void increment_counter(byte_packet_counter* counter, u_int16_t length, uint32_t sampling_rate) {
 	counter->packets += sampling_rate;
-	counter->bytes += length * sampling_rate;
+	counter->bytes += sampling_rate * length;
 }
 
 /* Increment a counter for a protocol, in a direction */
@@ -430,22 +421,18 @@ uint32_t ethernet_handler(const u_char* packet, const unsigned char* mac, uint32
 	else if (memcmp(eptr->ether_shost, mac, 6) != 0)
 	{
 		//Not a packet for us
-		return 0;
+		goto count;
 	}
-
+	
 	if (eptr->ether_type == hostorder_ipv4) {
 		ipv4_handler(packet, incomming, sampling_rate);
 	}
 	else if (eptr->ether_type == hostorder_ipv6) {
 		ipv6_handler(packet, incomming, sampling_rate);
 	}
-	else {
-		//We have no interest in non IP packets
-		return 0;
-	}
 
-	packet_counter++;
-	if (packet_counter >= packet_output_count) {
+	count:
+	if (packet_counter++ >= packet_output_count){
 		return output_stats();
 	}
 	return 0;
@@ -535,6 +522,34 @@ void get_mac(const char* name, unsigned char* mac_address)
 	}
 
 	if (success) memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
+}
+
+void adjust_samplerate(uint32_t packets, eth_def* eth){
+	//Handling sampling rate adjustments
+	int sampling_rate = (packets * eth->sampling_rate) / SAMPLES_DESIRED;
+	if(sampling_rate < 1) sampling_rate = 1;
+	int sampling_difference = sampling_rate - eth->sampling_rate;
+	if(sampling_difference < -10 || sampling_difference > 10){
+		/* Don't get too big during a burst in traffic. Otherwise the rate will jump too rapidly */
+		if(sampling_difference < -30){
+			sampling_difference = -30;
+		}else if(sampling_difference > 30){
+			sampling_difference = 30;
+		}
+		sampling_rate = eth->sampling_rate + sampling_difference;
+		
+		int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
+		if (rc < 0){
+			printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
+		}else{
+			eth->sampling_rate = (uint32_t)sampling_rate;
+
+			rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
+			if (rc < 0) {
+				printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
+			}
+		}
+	}
 }
 
 /* Process packets using PF_RING */
@@ -629,27 +644,8 @@ void run_pfring(const char** dev, int ndev)
 				else if (rc > 0)
 				{
 					uint32_t packets = ethernet_handler(buffer, eth->mac, eth->sampling_rate);
-					if (packets) {
-						//Handling sampling rate adjustments
-						int sampling_rate = (packets * eth->sampling_rate) / SAMPLES_DESIRED;
-						if (sampling_rate < 1) sampling_rate = 1;
-						int sampling_difference = sampling_rate - eth->sampling_rate;
-						if (sampling_difference < -10 || sampling_difference > 10) {
-							int rc = pfring_set_sampling_rate(eth->ring, sampling_rate);
-							if (rc < 0) {
-								printf("#Error: A PF_RING error occured while setting sampling rate: %s rc:%d\n", strerror(errno), rc);
-							}
-							else {
-								eth->sampling_rate = (uint32_t)sampling_rate;
-
-								rc = pfring_set_poll_watermark(eth->ring, calculate_watermark(sampling_rate));
-								if (rc < 0) {
-									printf("#Error: A PF_RING error occured while setting watermark: %s rc:%d\n", strerror(errno), rc);
-								}
-							}
-
-
-						}
+					if(packets){
+						adjust_samplerate(packets, eth);
 					}
 				}
 				else
@@ -688,7 +684,7 @@ int main(int argc, char **argv)
 	hostorder_ipv4 = ntohs(ETHERTYPE_IP);
 	hostorder_ipv6 = ntohs(ETHERTYPE_IPV6);
 
-	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	printf("# Init complete. Starting\n");
 
 	run_pfring((const char**)(argv + 1), argc - 1);
