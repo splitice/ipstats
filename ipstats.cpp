@@ -100,8 +100,6 @@ uint32_t packet_output_count = 1;
 time_t next_time = 0;
 time_t prev_time = 0;
 
-#define TIME_INTERVAL 15
-
 /* Hash an IPv6 address */
 uint32_t ipv6_hash(const ipv6_address& ip) {
 	uint16_t* twos = (uint16_t*)&ip;
